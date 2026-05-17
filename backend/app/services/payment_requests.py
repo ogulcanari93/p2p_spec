@@ -4,11 +4,20 @@ import uuid
 from datetime import datetime, timedelta, timezone
 
 from fastapi import HTTPException
-from sqlalchemy import or_, select
+from sqlalchemy import or_, select, update
 from sqlalchemy.orm import Session
 
 from app.config import settings
-from app.models import PaymentDestination, PaymentRequest, PaymentRequestStatus, RequestEventType, User
+from app.models import (
+    PaymentDestination,
+    PaymentRequest,
+    PaymentRequestStatus,
+    RequestEventType,
+    User,
+    Wallet,
+    WalletTransaction,
+    WalletTransactionDirection,
+)
 from app.services import security
 from app.services.events import record_event
 from app.services.money import MoneyValidationError, normalize_currency, parse_amount_to_minor
@@ -187,6 +196,132 @@ def list_payment_requests(
 def list_outgoing_requests(db: Session, sender: User) -> list[PaymentRequest]:
     outgoing, _ = list_payment_requests(db, sender, direction="outgoing")
     return outgoing
+
+
+def is_recipient(request: PaymentRequest, user: User) -> bool:
+    return bool(
+        request.recipient_user_id == user.id
+        or request.recipient_contact_hash == user.email_hash
+        or (user.phone_hash is not None and request.recipient_contact_hash == user.phone_hash)
+    )
+
+
+def _as_utc(dt: datetime) -> datetime:
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
+
+
+def is_request_expired(request: PaymentRequest, now: datetime | None = None) -> bool:
+    now = _as_utc(now or datetime.now(timezone.utc))
+    expires = _as_utc(request.expires_at)
+    return request.status == PaymentRequestStatus.PENDING.value and expires <= now
+
+
+def pay_payment_request(db: Session, request_id: str, payer: User) -> PaymentRequest:
+    request = db.get(PaymentRequest, request_id)
+    if not request:
+        raise HTTPException(status_code=404, detail="Payment request not found.")
+
+    if request.sender_user_id == payer.id:
+        raise HTTPException(status_code=403, detail="You cannot pay your own payment request.")
+
+    if not is_recipient(request, payer):
+        raise HTTPException(status_code=403, detail="Only the recipient can pay this request.")
+
+    now = datetime.now(timezone.utc)
+
+    if request.status == PaymentRequestStatus.PAID.value:
+        raise HTTPException(status_code=409, detail="This payment request has already been paid.")
+
+    if request.status != PaymentRequestStatus.PENDING.value:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Cannot pay a request with status {request.status}.",
+        )
+
+    if is_request_expired(request, now):
+        raise HTTPException(status_code=422, detail="This payment request has expired.")
+
+    existing_credit = db.execute(
+        select(WalletTransaction).where(
+            WalletTransaction.payment_request_id == request_id,
+            WalletTransaction.direction == WalletTransactionDirection.CREDIT.value,
+        )
+    ).scalar_one_or_none()
+    if existing_credit:
+        raise HTTPException(status_code=409, detail="This payment request has already been paid.")
+
+    previous_status = request.status
+    update_result = db.execute(
+        update(PaymentRequest)
+        .where(
+            PaymentRequest.id == request_id,
+            PaymentRequest.status == PaymentRequestStatus.PENDING.value,
+        )
+        .values(
+            status=PaymentRequestStatus.PAID.value,
+            paid_at=now,
+            updated_at=now,
+        )
+    )
+    if update_result.rowcount == 0:
+        db.refresh(request)
+        if request.status == PaymentRequestStatus.PAID.value:
+            raise HTTPException(status_code=409, detail="This payment request has already been paid.")
+        raise HTTPException(
+            status_code=422,
+            detail=f"Cannot pay a request with status {request.status}.",
+        )
+
+    db.refresh(request)
+
+    destination = db.get(PaymentDestination, request.destination_id)
+    if not destination:
+        raise HTTPException(status_code=422, detail="Payment destination is no longer available.")
+
+    if destination.destination_type == "INTERNAL_WALLET" and destination.wallet_id:
+        wallet = db.get(Wallet, destination.wallet_id)
+        if not wallet:
+            raise HTTPException(status_code=422, detail="Sender wallet is not available.")
+        if wallet.status != "ACTIVE":
+            raise HTTPException(status_code=422, detail="Sender wallet is not active.")
+
+        wallet.balance_minor += request.amount_minor
+        wallet.available_balance_minor += request.amount_minor
+        wallet.updated_at = now
+
+        db.add(
+            WalletTransaction(
+                id=str(uuid.uuid4()),
+                wallet_id=wallet.id,
+                payment_request_id=request.id,
+                direction=WalletTransactionDirection.CREDIT.value,
+                amount_minor=request.amount_minor,
+                currency=request.currency,
+                status="POSTED",
+                description=f"Payment received for request {request.id[:8]}",
+                created_at=now,
+            )
+        )
+
+    record_event(
+        db,
+        payment_request_id=request.id,
+        event_type=RequestEventType.REQUEST_PAID,
+        actor_user_id=payer.id,
+        previous_status=previous_status,
+        new_status=PaymentRequestStatus.PAID.value,
+        metadata={
+            "amount_minor": request.amount_minor,
+            "currency": request.currency,
+            "direction": WalletTransactionDirection.CREDIT.value,
+        },
+    )
+
+    db.commit()
+    db.refresh(request)
+    return request
 
 
 def share_url(share_token: str) -> str:

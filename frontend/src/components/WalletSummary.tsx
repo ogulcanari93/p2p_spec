@@ -2,7 +2,11 @@ import { useEffect, useState } from "react";
 import { ApiError, fetchWallet, type Wallet } from "../api/client";
 import { AmountDisplay } from "./AmountDisplay";
 
-export function WalletSummary() {
+type Props = {
+  refreshKey?: number;
+};
+
+export function WalletSummary({ refreshKey = 0 }: Props) {
   const [wallet, setWallet] = useState<Wallet | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -10,7 +14,7 @@ export function WalletSummary() {
     fetchWallet()
       .then(setWallet)
       .catch((err) => setError(err instanceof ApiError ? err.message : "Failed to load wallet"));
-  }, []);
+  }, [refreshKey]);
 
   if (error) {
     return (

@@ -157,6 +157,10 @@ export function createRequest(payload: {
   });
 }
 
+export function payRequest(id: string) {
+  return apiFetch<PaymentRequestDetail>(`/api/requests/${id}/pay`, { method: "POST" });
+}
+
 export function fetchRequests(params?: {
   direction?: string;
   status?: string;

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { ApiError, fetchRequests, type PaymentRequestSummary } from "../api/client";
 import { EmptyState } from "../components/EmptyState";
@@ -13,12 +13,14 @@ function RequestSection({
   requests,
   direction,
   loading,
+  onRequestUpdated,
 }: {
   title: string;
   description: string;
   requests: PaymentRequestSummary[];
   direction: "incoming" | "outgoing";
   loading: boolean;
+  onRequestUpdated?: () => void;
 }) {
   return (
     <section className="card dashboard-section">
@@ -33,10 +35,19 @@ function RequestSection({
       )}
       {!loading && requests.length > 0 && (
         <>
-          <RequestTable requests={requests} direction={direction} />
+          <RequestTable
+            requests={requests}
+            direction={direction}
+            onRequestUpdated={onRequestUpdated}
+          />
           <div className="request-card-list hide-desktop">
             {requests.map((r) => (
-              <RequestCard key={r.id} request={r} direction={direction} />
+              <RequestCard
+                key={r.id}
+                request={r}
+                direction={direction}
+                onRequestUpdated={onRequestUpdated}
+              />
             ))}
           </div>
         </>
@@ -53,6 +64,11 @@ export function DashboardPage() {
   const [incoming, setIncoming] = useState<PaymentRequestSummary[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  const reloadRequests = useCallback(() => {
+    setRefreshKey((key) => key + 1);
+  }, []);
 
   useEffect(() => {
     const timer = window.setTimeout(() => setSearchQuery(searchInput.trim()), 300);
@@ -69,7 +85,7 @@ export function DashboardPage() {
       })
       .catch((err) => setError(err instanceof ApiError ? err.message : "Failed to load requests"))
       .finally(() => setLoading(false));
-  }, [status, searchQuery]);
+  }, [status, searchQuery, refreshKey]);
 
   return (
     <div className="dashboard">
@@ -83,7 +99,7 @@ export function DashboardPage() {
         </Link>
       </div>
 
-      <WalletSummary />
+      <WalletSummary refreshKey={refreshKey} />
 
       <SearchAndFilterBar
         status={status}
@@ -100,6 +116,7 @@ export function DashboardPage() {
         requests={incoming}
         direction="incoming"
         loading={loading}
+        onRequestUpdated={reloadRequests}
       />
 
       <RequestSection
@@ -108,6 +125,7 @@ export function DashboardPage() {
         requests={outgoing}
         direction="outgoing"
         loading={loading}
+        onRequestUpdated={reloadRequests}
       />
     </div>
   );

@@ -6,6 +6,7 @@ import { StatusBadge } from "./StatusBadge";
 type Props = {
   requests: PaymentRequestSummary[];
   direction: "incoming" | "outgoing";
+  onRequestUpdated?: () => void;
 };
 
 function formatDate(iso: string) {
@@ -16,7 +17,7 @@ function formatDate(iso: string) {
   });
 }
 
-export function RequestTable({ requests, direction }: Props) {
+export function RequestTable({ requests, direction, onRequestUpdated }: Props) {
   const counterpartyHeader = direction === "incoming" ? "From" : "To";
 
   return (
@@ -45,7 +46,11 @@ export function RequestTable({ requests, direction }: Props) {
               <td className="requests-table__note">{r.note ?? "—"}</td>
               <td>{formatDate(r.created_at)}</td>
               <td>
-                <RequestActions request={r} direction={direction} />
+                <RequestActions
+                  request={r}
+                  direction={direction}
+                  onRequestUpdated={onRequestUpdated}
+                />
               </td>
             </tr>
           ))}

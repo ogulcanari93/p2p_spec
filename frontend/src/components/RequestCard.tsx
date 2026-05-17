@@ -6,6 +6,7 @@ import { StatusBadge } from "./StatusBadge";
 type Props = {
   request: PaymentRequestSummary;
   direction: "incoming" | "outgoing";
+  onRequestUpdated?: () => void;
 };
 
 function formatDate(iso: string) {
@@ -16,7 +17,7 @@ function formatDate(iso: string) {
   });
 }
 
-export function RequestCard({ request, direction }: Props) {
+export function RequestCard({ request, direction, onRequestUpdated }: Props) {
   const counterpartyLabel = direction === "incoming" ? "From" : "To";
   const displayStatus =
     request.is_expired && request.status === "PENDING" ? "EXPIRED" : request.status;
@@ -36,7 +37,11 @@ export function RequestCard({ request, direction }: Props) {
         </p>
       )}
       <p className="request-card__meta request-card__date">{formatDate(request.created_at)}</p>
-      <RequestActions request={request} direction={direction} />
+      <RequestActions
+        request={request}
+        direction={direction}
+        onRequestUpdated={onRequestUpdated}
+      />
     </article>
   );
 }

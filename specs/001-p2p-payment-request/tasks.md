@@ -137,15 +137,15 @@
 
 ### Tests for User Story 3
 
-- [ ] T060 [P] [US3] Add duplicate-pay and wallet-credit assertions in `backend/tests/test_payment_requests.py`
-- [ ] T061 [P] [US3] Add pytest: sender **cannot** `POST /api/requests/{id}/pay` on own outgoing request → **403** (or domain-equivalent) (U4)
+- [X] T060 [P] [US3] Add duplicate-pay and wallet-credit assertions in `backend/tests/test_payment_requests.py`
+- [X] T061 [P] [US3] Add pytest: sender **cannot** `POST /api/requests/{id}/pay` on own outgoing request → **403** (or domain-equivalent) (U4)
 
 ### Implementation for User Story 3
 
-- [ ] T062 [US3] Implement `pay_payment_request()` in `backend/app/services/payment_requests.py` — recipient auth, reject sender self-pay, expiration check, `UPDATE WHERE PENDING`, wallet CREDIT, `wallet_transactions`, `REQUEST_PAID` in one transaction
-- [ ] T063 [US3] Implement `POST /api/requests/{id}/pay` in `backend/app/routers/payment_requests.py`
-- [ ] T064 [P] [US3] Create `frontend/src/components/LoadingButton.tsx` with 2–3s minimum disabled state
-- [ ] T065 [US3] Connect dashboard **Pay** stubs in `RequestTable.tsx` / `RequestCard.tsx` to `LoadingButton` + pay API (replaces US2 stub) (I1)
+- [X] T062 [US3] Implement `pay_payment_request()` in `backend/app/services/payment_requests.py` — recipient auth, reject sender self-pay, expiration check, `UPDATE WHERE PENDING`, wallet CREDIT, `wallet_transactions`, `REQUEST_PAID` in one transaction
+- [X] T063 [US3] Implement `POST /api/requests/{id}/pay` in `backend/app/routers/payment_requests.py`
+- [X] T064 [P] [US3] Create `frontend/src/components/LoadingButton.tsx` with 2–3s minimum disabled state
+- [X] T065 [US3] Connect dashboard **Pay** stubs in `RequestTable.tsx` / `RequestCard.tsx` to `LoadingButton` + pay API (replaces US2 stub) (I1)
 
 **Checkpoint**: Pay flow credits sender wallet once; duplicate pay and self-pay rejected
 

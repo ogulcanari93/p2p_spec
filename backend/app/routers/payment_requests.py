@@ -4,10 +4,20 @@ from sqlalchemy.orm import Session
 from app.auth import get_current_user
 from app.database import get_db
 from app.models import User
-from app.schemas import CreatePaymentRequestIn, CreatePaymentRequestResponse, PaymentRequestListOut
+from app.schemas import (
+    CreatePaymentRequestIn,
+    CreatePaymentRequestResponse,
+    PaymentRequestDetailOut,
+    PaymentRequestListOut,
+)
 from app.serializers import request_to_detail, request_to_summary
 from app.services.expiration import expire_pending_for_user
-from app.services.payment_requests import create_payment_request, list_payment_requests, share_url
+from app.services.payment_requests import (
+    create_payment_request,
+    list_payment_requests,
+    pay_payment_request,
+    share_url,
+)
 
 router = APIRouter(prefix="/api/requests", tags=["payment-requests"])
 
@@ -68,3 +78,15 @@ def list_requests(
         outgoing=_summaries_for_requests(db, outgoing_rows, current_user),
         incoming=_summaries_for_requests(db, incoming_rows, current_user),
     )
+
+
+@router.post("/{request_id}/pay", response_model=PaymentRequestDetailOut)
+def post_pay_request(
+    request_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> PaymentRequestDetailOut:
+    expire_pending_for_user(db, current_user)
+    request = pay_payment_request(db, request_id, current_user)
+    sender = db.get(User, request.sender_user_id)
+    return request_to_detail(db, request, viewer=current_user, sender=sender)
