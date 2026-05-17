@@ -1,46 +1,87 @@
 # P2P Payment Requests
 
-Consumer fintech prototype for requesting money from friends (similar to Venmo Request). Users log in with email, create payment requests to a payout destination they own, and share a link with recipients.
+A consumer fintech prototype for requesting money from friends—similar to **Venmo Request** or **Cash App Request**. Senders create a payment request tied to their payout destination; recipients pay or decline from a dashboard or from a public share link.
 
-## Spec-Kit artifacts
+**Repository:** https://github.com/ogulcanari93/p2p_spec
 
-| Artifact | Path |
-|----------|------|
-| Specification | [specs/001-p2p-payment-request/spec.md](specs/001-p2p-payment-request/spec.md) |
-| Plan | [specs/001-p2p-payment-request/plan.md](specs/001-p2p-payment-request/plan.md) |
-| Tasks | [specs/001-p2p-payment-request/tasks.md](specs/001-p2p-payment-request/tasks.md) |
+| | |
+|---|---|
+| **Live demo** | Deploy with [docs/DEPLOY.md](docs/DEPLOY.md) — paste your URL here after Render deploy |
+| **Demo video** | [docs/demo/walkthrough.webm](docs/demo/walkthrough.webm) (automated Playwright tour, ~2 min) |
+
+### Quick try (no install)
+
+After the live demo is deployed, open the URL and sign in as `ayca@example.com` with password `1234`. Pay a pending incoming request, then sign in as `ogulcan@example.com` / `1234` to confirm it shows **Paid**. All seed users use password `1234`.
+
+---
+
+## What is in this repo
+
+Everything required for review is included in one place:
+
+| Deliverable | Location |
+|-------------|----------|
+| **Spec-Kit specification** | [specs/001-p2p-payment-request/spec.md](specs/001-p2p-payment-request/spec.md) |
+| **Implementation plan** | [specs/001-p2p-payment-request/plan.md](specs/001-p2p-payment-request/plan.md) |
+| **Research & data model** | [research.md](specs/001-p2p-payment-request/research.md), [data-model.md](specs/001-p2p-payment-request/data-model.md) |
+| **OpenAPI contract** | [contracts/openapi.yaml](specs/001-p2p-payment-request/contracts/openapi.yaml) |
+| **Task breakdown** | [tasks.md](specs/001-p2p-payment-request/tasks.md) |
+| **Spec-Kit tooling** | [.specify/](.specify/), [.cursor/skills/](.cursor/skills/) |
+| **Backend source** | [backend/](backend/) |
+| **Frontend source** | [frontend/](frontend/) |
+| **E2E test suite** | [e2e/](e2e/) |
+| **Screen recording** | [docs/demo/walkthrough.webm](docs/demo/walkthrough.webm) |
+| **Deploy config** | [render.yaml](render.yaml) |
+
+---
+
+## Features
+
+- Email + password sign-in (prototype; seed users below)
+- Dashboard with wallet balance, incoming/outgoing requests, status filter, and search
+- Create request to a **registered** recipient (email or phone)
+- Human-readable **Request ID** (`PR-YYYYMMDD-NNNN`) on create, detail, share page, and success modals
+- Pay / Decline / Cancel with loading overlay and in-app success/error modals
+- Insufficient balance check before pay
+- Public share link (`/r/:token`) with masked fields only
+- Lifecycle: Pending → Paid / Declined / Cancelled / Expired (7-day expiration on read/action)
+
+---
 
 ## Tech stack
 
-- **Frontend**: React, Vite, TypeScript
-- **Backend**: Python, FastAPI, SQLAlchemy
-- **Database**: SQLite (prototype; use PostgreSQL in production)
+| Layer | Stack |
+|-------|--------|
+| Frontend | React 18, Vite 5, TypeScript, React Router |
+| Backend | Python 3.12+, FastAPI, SQLAlchemy 2, Pydantic v2 |
+| Database | SQLite (prototype) |
+| Tests | pytest, Playwright |
 
-## Prototype authentication
+### AI tools used
 
-Protected API routes use the **`X-User-Email` header** only (no JWT/session). This is **not production-safe**.
+- **[GitHub Spec Kit](https://github.com/github/spec-kit)** — `/speckit.specify`, `/speckit.plan`, `/speckit.tasks`, `/speckit.implement`
+- **[Cursor](https://cursor.com)** — implementation, tests, UX polish, documentation
 
-## Security & logging
+Spec Kit drove the spec → plan → tasks → incremental delivery workflow. Cursor was used for coding and review; behavior was validated with automated tests.
 
-- Public share responses expose only `PublicShareView` fields (no `wallet_id`, `destination_id`, `encrypted_identifier`, or provider refs).
-- Application logs and audit event metadata must not include raw recipient contacts, wallet IDs on public paths, encrypted identifiers, or provider account references.
+---
 
-## Local development
+## Local setup
 
-See [specs/001-p2p-payment-request/quickstart.md](specs/001-p2p-payment-request/quickstart.md) for full commands.
+**Prerequisites:** Python 3.12+, Node.js 18+
 
-### Backend
+### 1. Backend
 
 ```bash
 cd backend
 python -m venv .venv
-source .venv/bin/activate
+source .venv/bin/activate          # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
-python seed.py
+python seed.py --reset
 uvicorn app.main:app --reload --port 8000
 ```
 
-### Frontend (dev with API proxy)
+### 2. Frontend (second terminal)
 
 ```bash
 cd frontend
@@ -48,39 +89,74 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:5173
+Open **http://localhost:5173** (API proxied to port 8000).
 
-### Production-style (single server)
-
-```bash
-cd frontend && npm run build
-cd ../backend && source .venv/bin/activate
-export STATIC_DIR=../frontend/dist
-uvicorn app.main:app --host 0.0.0.0 --port 8000
-```
-
-Open http://localhost:8000
-
-### Demo seed users
-
-After `python seed.py`:
+### Demo accounts (password `1234` for all)
 
 | Email | Notes |
 |-------|--------|
-| `ogulcan@example.com` | Sender with mixed outgoing requests |
-| `ayca@example.com` | Recipient / sender samples |
-| `mehmet@example.com` | Has phone `+905551234567` for phone-match incoming |
+| `ogulcan@example.com` | Sender / mixed sample requests |
+| `ayca@example.com` | Recipient; wallet ~5000 TRY |
+| `mehmet@example.com` | Phone `+905551234567`; use for insufficient-balance demo |
 
-### Tests
+---
+
+## Tests
+
+### Backend (pytest)
 
 ```bash
-cd backend
-source .venv/bin/activate
-pytest -v
+cd backend && source .venv/bin/activate && pytest -v
 ```
 
-Tests use an isolated in-memory SQLite database (`tests/conftest.py`) and do not require `data/app.db`.
+### E2E (Playwright)
 
-## Playwright E2E
+```bash
+cd e2e
+npm install
+npx playwright install chromium
+npm run test
+```
 
-Planned under `e2e/` (see tasks T085–T086). Run with video on failure when configured.
+Uses ports **8001** (API) and **5174** (UI). Covers happy paths, edge cases (wrong password, unknown recipient, self-request, insufficient balance, share-link pay), and mobile dashboard.
+
+### Re-record demo video
+
+```bash
+./scripts/record-demo.sh
+```
+
+Writes to `docs/demo/walkthrough.webm`.
+
+---
+
+## Live demo (Render)
+
+1. Push this repo to GitHub (public).
+2. Follow [docs/DEPLOY.md](docs/DEPLOY.md): Render → **New Blueprint** → select repo → apply `render.yaml`.
+3. Copy the service URL (e.g. `https://p2p-payment-request.onrender.com`) into the table at the top of this README.
+
+Free tier may **cold-start** (~30–60 s) after idle time. Each deploy re-seeds demo data.
+
+---
+
+## Spec-Kit workflow
+
+1. **Specify** — user stories, FRs, edge cases → `spec.md`
+2. **Plan** — architecture, contracts → `plan.md`, `openapi.yaml`
+3. **Tasks** — ordered implementation → `tasks.md`
+4. **Implement** — backend, frontend, seed, E2E, polish
+
+---
+
+## Security notes (prototype)
+
+- After login, the API trusts `X-User-Email` (no JWT). Documented as non-production.
+- Amounts stored as integer minor units; TRY validated to two decimal places.
+- Public share responses exclude wallet IDs and sensitive destination data.
+
+---
+
+## License
+
+MIT — see [LICENSE](LICENSE) if present.

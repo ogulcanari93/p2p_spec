@@ -1,6 +1,11 @@
 import { Link } from "react-router-dom";
-import { ApiError, cancelRequest, declineRequest, payRequest, type PaymentRequestSummary } from "../api/client";
-import { LoadingButton } from "./LoadingButton";
+import { cancelRequest, declineRequest, payRequest, type PaymentRequestSummary } from "../api/client";
+import {
+  CANCEL_ACTION,
+  DECLINE_ACTION,
+  PAY_ACTION,
+  useRequestAction,
+} from "../context/RequestActionContext";
 
 type Props = {
   request: PaymentRequestSummary;
@@ -9,42 +14,54 @@ type Props = {
 };
 
 export function RequestActions({ request, direction, onRequestUpdated }: Props) {
+  const { runRequestAction, busy } = useRequestAction();
   const showPay = direction === "incoming" && request.can_pay;
   const showDecline = direction === "incoming" && request.can_decline;
   const showCancel = direction === "outgoing" && request.can_cancel;
 
-  const runAction = (action: () => Promise<unknown>) => async () => {
+  const wrap = (config: typeof PAY_ACTION, action: () => Promise<unknown>) => async () => {
     try {
-      await action();
+      await runRequestAction(config, action);
       onRequestUpdated?.();
-    } catch (err) {
-      const message = err instanceof ApiError ? err.message : "Action failed.";
-      window.alert(message);
+    } catch {
+      /* errors shown via alert in runRequestAction */
     }
   };
 
   return (
     <div className="request-actions">
       {showPay && (
-        <LoadingButton className="btn btn--primary btn--sm" onClick={runAction(() => payRequest(request.id))}>
+        <button
+          type="button"
+          className="btn btn--primary btn--sm"
+          data-testid="pay-button"
+          disabled={busy}
+          onClick={() => void wrap(PAY_ACTION, () => payRequest(request.id))()}
+        >
           Pay
-        </LoadingButton>
+        </button>
       )}
       {showDecline && (
-        <LoadingButton
+        <button
+          type="button"
           className="btn btn--danger btn--sm"
-          onClick={runAction(() => declineRequest(request.id))}
+          data-testid="decline-button"
+          disabled={busy}
+          onClick={() => void wrap(DECLINE_ACTION, () => declineRequest(request.id))()}
         >
           Decline
-        </LoadingButton>
+        </button>
       )}
       {showCancel && (
-        <LoadingButton
+        <button
+          type="button"
           className="btn btn--secondary btn--sm"
-          onClick={runAction(() => cancelRequest(request.id))}
+          data-testid="cancel-button"
+          disabled={busy}
+          onClick={() => void wrap(CANCEL_ACTION, () => cancelRequest(request.id))()}
         >
           Cancel
-        </LoadingButton>
+        </button>
       )}
       <Link to={`/requests/${request.id}`} className="btn btn--secondary btn--sm">
         View Details
@@ -52,3 +69,4 @@ export function RequestActions({ request, direction, onRequestUpdated }: Props) 
     </div>
   );
 }
+

@@ -1,7 +1,9 @@
 import type { PaymentRequestSummary } from "../api/client";
 import { AmountDisplay } from "./AmountDisplay";
 import { RequestActions } from "./RequestActions";
+import { RequestExpirationHint } from "./RequestExpirationHint";
 import { StatusBadge } from "./StatusBadge";
+import { resolveDisplayStatus } from "../utils/expiration";
 
 type Props = {
   request: PaymentRequestSummary;
@@ -19,8 +21,7 @@ function formatDate(iso: string) {
 
 export function RequestCard({ request, direction, onRequestUpdated }: Props) {
   const counterpartyLabel = direction === "incoming" ? "From" : "To";
-  const displayStatus =
-    request.is_expired && request.status === "PENDING" ? "EXPIRED" : request.status;
+  const displayStatus = resolveDisplayStatus(request.status, request.is_expired);
 
   return (
     <article className="request-card hide-desktop">
@@ -37,6 +38,13 @@ export function RequestCard({ request, direction, onRequestUpdated }: Props) {
         </p>
       )}
       <p className="request-card__meta request-card__date">{formatDate(request.created_at)}</p>
+      <p className="request-card__meta">
+        <RequestExpirationHint
+          expiresAt={request.expires_at}
+          status={request.status}
+          isExpired={request.is_expired}
+        />
+      </p>
       <RequestActions
         request={request}
         direction={direction}

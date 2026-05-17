@@ -34,6 +34,15 @@ from app.main import app  # noqa: E402
 @pytest.fixture(autouse=True)
 def setup_database():
     Base.metadata.create_all(bind=test_engine)
+    session = TestingSessionLocal()
+    try:
+        from app.services.users import ensure_user
+
+        ensure_user(session, email="alice@example.com", display_name="Alice")
+        ensure_user(session, email="bob@example.com", display_name="Bob")
+        session.commit()
+    finally:
+        session.close()
     yield
     Base.metadata.drop_all(bind=test_engine)
 

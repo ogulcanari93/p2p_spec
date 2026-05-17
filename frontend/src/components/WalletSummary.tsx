@@ -18,7 +18,7 @@ export function WalletSummary({ refreshKey = 0 }: Props) {
 
   if (error) {
     return (
-      <div className="card wallet-summary">
+      <div className="card wallet-summary" data-testid="wallet-summary">
         <p className="form-error">{error}</p>
       </div>
     );
@@ -26,14 +26,14 @@ export function WalletSummary({ refreshKey = 0 }: Props) {
 
   if (!wallet) {
     return (
-      <div className="card wallet-summary">
+      <div className="card wallet-summary" data-testid="wallet-summary">
         <p style={{ color: "var(--muted)", margin: 0 }}>Loading wallet…</p>
       </div>
     );
   }
 
   return (
-    <div className="card wallet-summary">
+    <div className="card wallet-summary" data-testid="wallet-summary">
       <h2 style={{ marginTop: 0, fontSize: "1rem" }}>Your wallet</h2>
       <p style={{ margin: 0, fontSize: "1.5rem" }}>
         <AmountDisplay amountMinor={wallet.balance_minor} currency={wallet.currency} />

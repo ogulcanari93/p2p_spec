@@ -55,6 +55,7 @@ class User(Base):
     display_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     phone: Mapped[str | None] = mapped_column(String(32), unique=True, nullable=True)
     phone_hash: Mapped[str | None] = mapped_column(String(64), unique=True, nullable=True)
+    password_hash: Mapped[str] = mapped_column(String(64), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, onupdate=utcnow
@@ -122,9 +123,11 @@ class PaymentRequest(Base):
         Index("ix_payment_requests_recipient_contact_hash", "recipient_contact_hash"),
         Index("ix_payment_requests_status", "status"),
         Index("ix_payment_requests_expires_at", "expires_at"),
+        UniqueConstraint("reference_code", name="uq_payment_requests_reference_code"),
     )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    reference_code: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
     share_token: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
     sender_user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), nullable=False)
     recipient_user_id: Mapped[str | None] = mapped_column(ForeignKey("users.id"), nullable=True)

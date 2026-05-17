@@ -1,11 +1,12 @@
 import { FormEvent, useState } from "react";
 
 type Props = {
-  onSubmit: (email: string) => Promise<void>;
+  onSubmit: (email: string, password: string) => Promise<void>;
 };
 
 export function LoginForm({ onSubmit }: Props) {
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -14,7 +15,7 @@ export function LoginForm({ onSubmit }: Props) {
     setError(null);
     setSubmitting(true);
     try {
-      await onSubmit(email);
+      await onSubmit(email, password);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed");
     } finally {
@@ -26,12 +27,13 @@ export function LoginForm({ onSubmit }: Props) {
     <form className="card" onSubmit={handleSubmit}>
       <h1>Sign in</h1>
       <p style={{ color: "var(--muted)", marginTop: 0 }}>
-        Prototype auth: enter your email. New users are registered automatically.
+        Sign in with your registered email. Demo password for seed users is <strong>1234</strong>.
       </p>
       <div className="form-field">
         <label htmlFor="email">Email</label>
         <input
           id="email"
+          data-testid="login-email"
           type="email"
           required
           autoComplete="email"
@@ -40,9 +42,22 @@ export function LoginForm({ onSubmit }: Props) {
           placeholder="you@example.com"
         />
       </div>
+      <div className="form-field">
+        <label htmlFor="password">Password</label>
+        <input
+          id="password"
+          data-testid="login-password"
+          type="password"
+          required
+          autoComplete="current-password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          placeholder="1234"
+        />
+      </div>
       {error && <p className="form-error">{error}</p>}
-      <button type="submit" className="btn btn--primary" disabled={submitting}>
-        {submitting ? "Signing in…" : "Continue"}
+      <button type="submit" className="btn btn--primary" data-testid="login-submit" disabled={submitting}>
+        {submitting ? "Signing in…" : "Sign in"}
       </button>
     </form>
   );

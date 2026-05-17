@@ -18,6 +18,7 @@ class UserOut(BaseModel):
 
 class LoginRequest(BaseModel):
     email: EmailStr
+    password: str = Field(min_length=1, max_length=128)
 
 
 class LoginResponse(BaseModel):
@@ -72,6 +73,7 @@ class CreatePaymentRequestIn(BaseModel):
 
 class PaymentRequestSummaryOut(BaseModel):
     id: str
+    reference_code: str
     share_token: str
     status: str
     amount_minor: int
@@ -130,6 +132,7 @@ class PaymentRequestListOut(BaseModel):
 
 
 class PublicShareViewOut(BaseModel):
+    reference_code: str
     status: str
     amount_minor: int
     currency: str

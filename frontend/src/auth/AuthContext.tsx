@@ -19,7 +19,7 @@ import {
 type AuthContextValue = {
   user: User | null;
   loading: boolean;
-  login: (email: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<void>;
   logout: () => void;
 };
 
@@ -44,9 +44,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .finally(() => setLoading(false));
   }, []);
 
-  const login = useCallback(async (email: string) => {
+  const login = useCallback(async (email: string, password: string) => {
     const normalized = email.trim().toLowerCase();
-    const res = await apiLogin(normalized);
+    const res = await apiLogin(normalized, password);
     setStoredEmail(normalized);
     setUser(res.user);
   }, []);

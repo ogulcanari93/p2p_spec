@@ -1,0 +1,4 @@
+{
+  "playwright.configPath": "e2e/playwright.config.js",
+  "playwright.runGlobalSetupOnEachRun": true
+}

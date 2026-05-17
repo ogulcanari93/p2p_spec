@@ -1,9 +1,9 @@
 import { FormEvent, useState } from "react";
-import { ApiError, createRequest } from "../api/client";
+import { ApiError, createRequest, type CreateRequestResponse } from "../api/client";
 import { DestinationSelector } from "./DestinationSelector";
 
 type Props = {
-  onCreated: (shareUrl: string) => void;
+  onCreated: (response: CreateRequestResponse) => void;
 };
 
 const NOTE_MAX = 280;
@@ -35,7 +35,7 @@ export function CreateRequestForm({ onCreated }: Props) {
         note: note.trim() || undefined,
         destination_id: destinationId || undefined,
       });
-      onCreated(res.share_url);
+      onCreated(res);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Could not create request");
     } finally {
@@ -50,16 +50,21 @@ export function CreateRequestForm({ onCreated }: Props) {
         <label htmlFor="recipient">Recipient email or phone</label>
         <input
           id="recipient"
+          data-testid="create-recipient"
           required
           value={recipientContact}
           onChange={(e) => setRecipientContact(e.target.value)}
           placeholder="friend@example.com"
         />
+        <small style={{ color: "var(--muted)" }}>
+          Must be a registered user&apos;s email or phone number.
+        </small>
       </div>
       <div className="form-field">
         <label htmlFor="amount">Amount ({currency})</label>
         <input
           id="amount"
+          data-testid="create-amount"
           required
           inputMode="decimal"
           value={amount}
@@ -82,7 +87,7 @@ export function CreateRequestForm({ onCreated }: Props) {
         </small>
       </div>
       {error && <p className="form-error">{error}</p>}
-      <button type="submit" className="btn btn--primary" disabled={submitting}>
+      <button type="submit" className="btn btn--primary" data-testid="create-submit" disabled={submitting}>
         {submitting ? "Creating…" : "Create request"}
       </button>
     </form>

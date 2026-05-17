@@ -131,6 +131,195 @@ a {
   cursor: not-allowed;
 }
 
+.btn__loading {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.btn__spinner {
+  width: 1em;
+  height: 1em;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: btn-spin 0.65s linear infinite;
+}
+
+@keyframes btn-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.btn--loading {
+  pointer-events: none;
+}
+
+.action-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(2px);
+}
+
+.action-overlay__panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  padding: 2rem 2.5rem;
+  background: var(--surface, #fff);
+  border-radius: 12px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.18);
+  min-width: min(90vw, 280px);
+}
+
+.action-overlay__spinner {
+  width: 2.5rem;
+  height: 2.5rem;
+  border: 3px solid var(--border, #dee2e6);
+  border-top-color: var(--primary, #2563eb);
+  border-radius: 50%;
+  animation: btn-spin 0.75s linear infinite;
+}
+
+.action-overlay__message {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--text, #1a1a1a);
+}
+
+.action-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(15, 23, 42, 0.5);
+  backdrop-filter: blur(3px);
+  animation: modal-fade-in 0.2s ease-out;
+}
+
+.action-modal {
+  width: min(100%, 360px);
+  padding: 1.75rem 1.5rem 1.5rem;
+  text-align: center;
+  background: var(--surface);
+  border-radius: 14px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.2);
+  animation: modal-pop-in 0.25s ease-out;
+}
+
+.action-modal__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 3.5rem;
+  height: 3.5rem;
+  margin: 0 auto 1rem;
+  border-radius: 50%;
+  font-size: 1.75rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.action-modal__icon--success {
+  color: #fff;
+  background: linear-gradient(145deg, #22a06b, #1e7f57);
+}
+
+.action-modal__icon--error {
+  color: #fff;
+  background: linear-gradient(145deg, #e74c3c, #c0392b);
+}
+
+.action-modal__title {
+  margin: 0 0 0.5rem;
+  font-size: 1.125rem;
+  font-weight: 700;
+}
+
+.action-modal__message {
+  margin: 0 0 1.25rem;
+  color: var(--muted);
+  font-size: 0.95rem;
+  line-height: 1.45;
+}
+
+.action-modal .btn {
+  min-width: 7rem;
+}
+
+.action-modal__reference {
+  margin: -0.5rem 0 1rem;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+.action-modal__reference code {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text, #1a1a1a);
+}
+
+.reference-code {
+  margin: 0 0 1rem;
+  padding: 0.65rem 0.85rem;
+  background: var(--bg, #f4f6f8);
+  border-radius: 8px;
+  border: 1px solid var(--border, #e2e8f0);
+}
+
+.reference-code__label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.reference-code__value {
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.reference-code__value--compact {
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.create-success .reference-code {
+  margin-top: 0.5rem;
+}
+
+@keyframes modal-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes modal-pop-in {
+  from {
+    opacity: 0;
+    transform: scale(0.92) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
 .badge {
   display: inline-block;
   padding: 0.2rem 0.55rem;
@@ -305,6 +494,27 @@ table.requests-table td {
 .share-page {
   max-width: 32rem;
   margin: 2rem auto;
+}
+
+.expiration-countdown {
+  margin: 0.5rem 0 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.expiration-countdown--expired {
+  color: var(--danger);
+  font-weight: 600;
+}
+
+.request-expiration {
+  font-size: 0.8125rem;
+  color: var(--muted);
+}
+
+.request-expiration--expired {
+  color: var(--danger);
+  font-weight: 600;
 }
 
 @media (max-width: 640px) {

@@ -7,6 +7,8 @@ from app.models import (
     PaymentRequestStatus,
     RequestEvent,
     RequestEventType,
+    User,
+    Wallet,
     WalletTransaction,
     WalletTransactionDirection,
 )
@@ -16,8 +18,8 @@ def _headers(email: str) -> dict[str, str]:
     return {"X-User-Email": email}
 
 
-def _login(client, email: str) -> None:
-    response = client.post("/api/auth/login", json={"email": email})
+def _login(client, email: str, password: str = "1234") -> None:
+    response = client.post("/api/auth/login", json={"email": email, "password": password})
     assert response.status_code == 200
 
 
@@ -28,6 +30,10 @@ def _create_request(
     amount: str = "100.00",
     destination_id: str | None = None,
 ) -> str:
+    _login(client, sender_email)
+    if "@" in recipient:
+        _login(client, recipient.strip().lower())
+
     payload: dict = {
         "recipient_contact": recipient,
         "amount": amount,
@@ -50,12 +56,22 @@ def _wallet_balance(client, email: str) -> int:
     return response.json()["balance_minor"]
 
 
-def test_recipient_can_pay_pending_request(client):
+def _fund_wallet(db_session, email: str, balance_minor: int) -> None:
+    user = db_session.execute(select(User).where(User.email == email)).scalar_one()
+    wallet = db_session.execute(select(Wallet).where(Wallet.user_id == user.id)).scalar_one()
+    wallet.balance_minor = balance_minor
+    wallet.available_balance_minor = balance_minor
+    db_session.commit()
+
+
+def test_recipient_can_pay_pending_request(client, db_session):
     _login(client, "alice@example.com")
     _login(client, "bob@example.com")
+    _fund_wallet(db_session, "bob@example.com", 50_000)
 
     request_id = _create_request(client, "alice@example.com", "bob@example.com")
-    balance_before = _wallet_balance(client, "alice@example.com")
+    sender_before = _wallet_balance(client, "alice@example.com")
+    payer_before = _wallet_balance(client, "bob@example.com")
 
     pay_response = client.post(f"/api/requests/{request_id}/pay", headers=_headers("bob@example.com"))
     assert pay_response.status_code == 200
@@ -64,8 +80,8 @@ def test_recipient_can_pay_pending_request(client):
     assert body["paid_at"] is not None
     assert body["can_pay"] is False
 
-    balance_after = _wallet_balance(client, "alice@example.com")
-    assert balance_after == balance_before + 10000
+    assert _wallet_balance(client, "alice@example.com") == sender_before + 10000
+    assert _wallet_balance(client, "bob@example.com") == payer_before - 10000
 
 
 def test_sender_cannot_pay_own_outgoing_request(client):
@@ -77,9 +93,26 @@ def test_sender_cannot_pay_own_outgoing_request(client):
     assert "cannot pay your own" in response.json()["detail"].lower()
 
 
+def test_insufficient_balance_cannot_pay(client, db_session):
+    _login(client, "alice@example.com")
+    _login(client, "bob@example.com")
+    _fund_wallet(db_session, "bob@example.com", 0)
+
+    request_id = _create_request(client, "alice@example.com", "bob@example.com", amount="100.00")
+
+    response = client.post(f"/api/requests/{request_id}/pay", headers=_headers("bob@example.com"))
+    assert response.status_code == 422
+    assert "insufficient wallet balance" in response.json()["detail"].lower()
+
+    listed = client.get("/api/requests", headers=_headers("bob@example.com")).json()
+    incoming = next(r for r in listed["incoming"] if r["id"] == request_id)
+    assert incoming["can_pay"] is True
+
+
 def test_duplicate_pay_does_not_duplicate_wallet_credit(client, db_session):
     _login(client, "alice@example.com")
     _login(client, "bob@example.com")
+    _fund_wallet(db_session, "bob@example.com", 50_000)
 
     request_id = _create_request(client, "alice@example.com", "bob@example.com")
     balance_before = _wallet_balance(client, "alice@example.com")
@@ -175,9 +208,13 @@ def test_sender_can_cancel_pending_outgoing_request(client, db_session):
     assert any(e.event_type == RequestEventType.REQUEST_CANCELLED.value for e in events)
 
 
-def test_non_recipient_cannot_decline(client):
+def test_non_recipient_cannot_decline(client, db_session):
+    from app.services.users import ensure_user
+
     _login(client, "alice@example.com")
     _login(client, "bob@example.com")
+    ensure_user(db_session, email="carol@example.com", display_name="Carol")
+    db_session.commit()
     _login(client, "carol@example.com")
 
     request_id = _create_request(client, "alice@example.com", "bob@example.com")
@@ -279,6 +316,62 @@ def test_get_request_detail_includes_events(client):
     assert body["events"][0]["event_type"] == RequestEventType.REQUEST_CREATED.value
 
 
+def test_create_assigns_readable_reference_code(client):
+    _login(client, "alice@example.com")
+    response = client.post(
+        "/api/requests",
+        json={
+            "recipient_contact": "bob@example.com",
+            "amount": "12.50",
+            "currency": "TRY",
+            "note": "Reference code test",
+        },
+        headers=_headers("alice@example.com"),
+    )
+    assert response.status_code == 201
+    body = response.json()
+    code = body["request"]["reference_code"]
+    assert code.startswith("PR-")
+    parts = code.split("-")
+    assert len(parts) == 3
+    assert len(parts[1]) == 8
+    assert parts[1].isdigit()
+    assert len(parts[2]) == 4
+    assert parts[2].isdigit()
+
+
+def test_create_request_to_unknown_recipient_returns_422(client):
+    _login(client, "alice@example.com")
+
+    response = client.post(
+        "/api/requests",
+        json={
+            "recipient_contact": "unknown-person@example.com",
+            "amount": "10.00",
+            "currency": "TRY",
+        },
+        headers=_headers("alice@example.com"),
+    )
+    assert response.status_code == 422
+    assert "no registered user" in response.json()["detail"].lower()
+
+
+def test_create_request_to_self_returns_422(client):
+    _login(client, "alice@example.com")
+
+    response = client.post(
+        "/api/requests",
+        json={
+            "recipient_contact": "alice@example.com",
+            "amount": "10.00",
+            "currency": "TRY",
+        },
+        headers=_headers("alice@example.com"),
+    )
+    assert response.status_code == 422
+    assert "yourself" in response.json()["detail"].lower()
+
+
 def test_create_request_with_another_users_destination_returns_403(client):
     _login(client, "alice@example.com")
     _login(client, "bob@example.com")
@@ -293,7 +386,7 @@ def test_create_request_with_another_users_destination_returns_403(client):
     response = client.post(
         "/api/requests",
         json={
-            "recipient_contact": "carol@example.com",
+            "recipient_contact": "alice@example.com",
             "amount": "50.00",
             "currency": "TRY",
             "destination_id": alice_destination_id,
@@ -336,6 +429,7 @@ def test_list_expires_pending_requests(client, db_session):
 
 def test_public_share_excludes_sensitive_fields(client):
     _login(client, "alice@example.com")
+    _login(client, "bob@example.com")
     create_response = client.post(
         "/api/requests",
         json={"recipient_contact": "bob@example.com", "amount": "25.00", "currency": "TRY"},

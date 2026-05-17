@@ -8,6 +8,7 @@ import {
   type PublicShareView,
 } from "../api/client";
 import { AmountDisplay } from "../components/AmountDisplay";
+import { ReferenceCode } from "../components/ReferenceCode";
 import { StatusBadge } from "../components/StatusBadge";
 
 export function ShareRequestPage() {
@@ -65,8 +66,9 @@ export function ShareRequestPage() {
 
   return (
     <div className="layout">
-      <div className="card share-page">
+      <div className="card share-page" data-testid="share-page">
         <h1 style={{ marginTop: 0 }}>Payment request</h1>
+        <ReferenceCode code={share.reference_code} />
         <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", flexWrap: "wrap" }}>
           <AmountDisplay amountMinor={share.amount_minor} currency={share.currency} />
           <StatusBadge status={share.status} />
@@ -90,7 +92,11 @@ export function ShareRequestPage() {
 
         {user ? (
           detailRequestId ? (
-            <Link to={`/requests/${detailRequestId}`} className="btn btn--primary">
+            <Link
+              to={`/requests/${detailRequestId}`}
+              className="btn btn--primary"
+              data-testid="share-open-details"
+            >
               Open full details
             </Link>
           ) : (

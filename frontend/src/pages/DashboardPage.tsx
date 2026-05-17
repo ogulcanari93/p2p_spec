@@ -23,7 +23,10 @@ function RequestSection({
   onRequestUpdated?: () => void;
 }) {
   return (
-    <section className="card dashboard-section">
+    <section
+      className="card dashboard-section"
+      data-testid={direction === "incoming" ? "dashboard-incoming" : "dashboard-outgoing"}
+    >
       <h2 style={{ marginTop: 0 }}>{title}</h2>
       <p style={{ color: "var(--muted)", marginTop: 0 }}>{description}</p>
       {loading && <p style={{ color: "var(--muted)" }}>Loading…</p>}
@@ -76,15 +79,29 @@ export function DashboardPage() {
   }, [searchInput]);
 
   useEffect(() => {
+    let cancelled = false;
     setLoading(true);
     setError(null);
+    setOutgoing([]);
+    setIncoming([]);
+
     fetchRequests({ status, search: searchQuery || undefined })
       .then((data) => {
+        if (cancelled) return;
         setOutgoing(data.outgoing);
         setIncoming(data.incoming);
       })
-      .catch((err) => setError(err instanceof ApiError ? err.message : "Failed to load requests"))
-      .finally(() => setLoading(false));
+      .catch((err) => {
+        if (cancelled) return;
+        setError(err instanceof ApiError ? err.message : "Failed to load requests");
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, [status, searchQuery, refreshKey]);
 
   return (

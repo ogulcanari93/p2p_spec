@@ -94,6 +94,7 @@ export type DestinationSnapshot = {
 
 export type PaymentRequestSummary = {
   id: string;
+  reference_code: string;
   share_token: string;
   status: string;
   amount_minor: number;
@@ -138,6 +139,7 @@ export type PaymentRequestDetail = PaymentRequestSummary & {
 };
 
 export type PublicShareView = {
+  reference_code: string;
   status: string;
   amount_minor: number;
   currency: string;
@@ -159,10 +161,10 @@ export type PaymentRequestList = {
   incoming: PaymentRequestSummary[];
 };
 
-export function login(email: string) {
+export function login(email: string, password: string) {
   return apiFetch<{ user: User }>("/api/auth/login", {
     method: "POST",
-    body: JSON.stringify({ email }),
+    body: JSON.stringify({ email, password }),
   });
 }
 

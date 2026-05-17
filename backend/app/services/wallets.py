@@ -38,3 +38,9 @@ def get_default_wallet(db: Session, user: User, currency: str = "TRY") -> Wallet
         Wallet.status == "ACTIVE",
     )
     return db.execute(stmt).scalars().first()
+
+
+def wallet_can_cover_amount(wallet: Wallet | None, amount_minor: int) -> bool:
+    if not wallet or wallet.status != "ACTIVE":
+        return False
+    return wallet.available_balance_minor >= amount_minor

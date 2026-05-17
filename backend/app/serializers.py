@@ -50,11 +50,12 @@ def request_to_summary(
 
     status = request.status
     can_pay = is_recipient and status == "PENDING" and not expired
-    can_decline = can_pay
+    can_decline = is_recipient and status == "PENDING" and not expired
     can_cancel = is_sender and status == "PENDING" and not expired
 
     return PaymentRequestSummaryOut(
         id=request.id,
+        reference_code=request.reference_code,
         share_token=request.share_token,
         status=status,  # type: ignore[arg-type]
         amount_minor=request.amount_minor,

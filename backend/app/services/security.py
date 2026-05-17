@@ -1,9 +1,13 @@
 import hashlib
+import hmac
 import json
 import re
 from typing import Any
 
 from app.models import PaymentDestination, RecipientContactType
+
+DEFAULT_PASSWORD = "1234"
+_PASSWORD_SALT = "p2p-payment-request-prototype-v1"
 
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 PHONE_RE = re.compile(r"^\+?[0-9][0-9\s\-()]{6,20}$")
@@ -12,6 +16,15 @@ PHONE_RE = re.compile(r"^\+?[0-9][0-9\s\-()]{6,20}$")
 def hash_value(value: str) -> str:
     normalized = value.strip().lower()
     return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
+
+
+def hash_password(password: str) -> str:
+    payload = f"{_PASSWORD_SALT}:{password}".encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()
+
+
+def verify_password(password: str, password_hash: str) -> bool:
+    return hmac.compare_digest(hash_password(password), password_hash)
 
 
 def detect_contact_type(contact: str) -> RecipientContactType:

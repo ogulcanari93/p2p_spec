@@ -1,23 +1,31 @@
-"""Seed demo users, wallets, destinations, and sample payment requests."""
+"""Deterministic demo seed — reset with: python seed.py --reset"""
 
 from __future__ import annotations
 
-import uuid
+import argparse
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import select
-
-from app.database import SessionLocal, init_db
+from app.database import Base, SessionLocal, engine, init_db
 from app.models import PaymentRequest, PaymentRequestStatus, RequestEventType, User
 from app.services import security
 from app.services.events import record_event
 from app.services.payment_destinations import ensure_default_destination
-import secrets
-
-from app.services.security import build_destination_snapshot, snapshot_to_json
+from app.services.security import DEFAULT_PASSWORD, build_destination_snapshot, snapshot_to_json
+from app.services.users import ensure_user
 from app.services.wallets import ensure_default_wallet
 
 NOW = datetime.now(timezone.utc)
+
+USER_IDS = {
+    "ogulcan@example.com": "11111111-1111-4111-8111-111111111101",
+    "ayca@example.com": "11111111-1111-4111-8111-111111111102",
+    "mehmet@example.com": "11111111-1111-4111-8111-111111111103",
+}
+
+
+def reset_database() -> None:
+    Base.metadata.drop_all(bind=engine)
+    Base.metadata.create_all(bind=engine)
 
 
 def _user(
@@ -28,30 +36,33 @@ def _user(
     phone: str | None = None,
 ) -> User:
     normalized = email.strip().lower()
-    email_hash = security.hash_value(normalized)
-    existing = db.execute(select(User).where(User.email_hash == email_hash)).scalar_one_or_none()
-    if existing:
-        return existing
-
-    phone_hash = security.hash_value(phone) if phone else None
-    user = User(
-        id=str(uuid.uuid4()),
+    user = ensure_user(
+        db,
         email=normalized,
-        email_hash=email_hash,
         display_name=display_name,
         phone=phone,
-        phone_hash=phone_hash,
+        password=DEFAULT_PASSWORD,
+        user_id=USER_IDS[normalized],
     )
-    db.add(user)
-    db.flush()
-    ensure_default_wallet(db, user)
-    ensure_default_destination(db, user)
+    wallet = ensure_default_wallet(db, user)
+    if normalized == "ayca@example.com":
+        wallet.balance_minor = 500_000
+        wallet.available_balance_minor = 500_000
+    elif normalized == "ogulcan@example.com":
+        wallet.balance_minor = 100_000
+        wallet.available_balance_minor = 100_000
+    elif normalized == "mehmet@example.com":
+        wallet.balance_minor = 200_000
+        wallet.available_balance_minor = 200_000
     return user
 
 
 def _request(
     db,
     *,
+    request_id: str,
+    reference_code: str,
+    share_token: str,
     sender: User,
     recipient_contact: str,
     recipient_user: User | None,
@@ -73,8 +84,9 @@ def _request(
     expires = expires_at or (created + timedelta(days=7))
 
     req = PaymentRequest(
-        id=str(uuid.uuid4()),
-        share_token=secrets.token_urlsafe(16),
+        id=request_id,
+        reference_code=reference_code,
+        share_token=share_token,
         sender_user_id=sender.id,
         recipient_user_id=recipient_user.id if recipient_user else None,
         recipient_contact=normalized if contact_type.value == "EMAIL" else recipient_contact.strip(),
@@ -144,8 +156,12 @@ def _request(
     return req
 
 
-def seed() -> None:
-    init_db()
+def seed(*, reset: bool = False) -> None:
+    if reset:
+        reset_database()
+    else:
+        init_db()
+
     db = SessionLocal()
     try:
         ogulcan = _user(db, email="ogulcan@example.com", display_name="Ogulcan")
@@ -157,8 +173,12 @@ def seed() -> None:
             phone="+905551234567",
         )
 
+        day = NOW.strftime("%Y%m%d")
         _request(
             db,
+            request_id="22222222-2222-4222-8222-222222222201",
+            reference_code=f"PR-{day}-0001",
+            share_token="seed-share-pending-ogulcan-ayca",
             sender=ogulcan,
             recipient_contact="ayca@example.com",
             recipient_user=ayca,
@@ -168,15 +188,21 @@ def seed() -> None:
         )
         _request(
             db,
+            request_id="22222222-2222-4222-8222-222222222202",
+            reference_code=f"PR-{day}-0002",
+            share_token="seed-share-pending-ayca-ogulcan",
             sender=ayca,
             recipient_contact="ogulcan@example.com",
             recipient_user=ogulcan,
             amount_minor=5000,
             status=PaymentRequestStatus.PENDING.value,
-            note="Coffee",
+            note="E2E decline target",
         )
         _request(
             db,
+            request_id="22222222-2222-4222-8222-222222222203",
+            reference_code=f"PR-{day}-0003",
+            share_token="seed-share-paid-ogulcan-ayca",
             sender=ogulcan,
             recipient_contact="ayca@example.com",
             recipient_user=ayca,
@@ -187,6 +213,9 @@ def seed() -> None:
         )
         _request(
             db,
+            request_id="22222222-2222-4222-8222-222222222204",
+            reference_code=f"PR-{day}-0004",
+            share_token="seed-share-declined-mehmet-ogulcan",
             sender=mehmet,
             recipient_contact="ogulcan@example.com",
             recipient_user=ogulcan,
@@ -197,6 +226,9 @@ def seed() -> None:
         )
         _request(
             db,
+            request_id="22222222-2222-4222-8222-222222222205",
+            reference_code=f"PR-{day}-0005",
+            share_token="seed-share-cancel-ogulcan-ayca",
             sender=ogulcan,
             recipient_contact="ayca@example.com",
             recipient_user=ayca,
@@ -207,6 +239,9 @@ def seed() -> None:
         )
         _request(
             db,
+            request_id="22222222-2222-4222-8222-222222222206",
+            reference_code=f"PR-{day}-0006",
+            share_token="seed-share-expired-ayca-ogulcan",
             sender=ayca,
             recipient_contact="ogulcan@example.com",
             recipient_user=ogulcan,
@@ -218,6 +253,9 @@ def seed() -> None:
         )
         _request(
             db,
+            request_id="22222222-2222-4222-8222-222222222207",
+            reference_code=f"PR-{day}-0007",
+            share_token="seed-share-phone-ogulcan-mehmet",
             sender=ogulcan,
             recipient_contact="+905551234567",
             recipient_user=mehmet,
@@ -225,14 +263,48 @@ def seed() -> None:
             status=PaymentRequestStatus.PENDING.value,
             note="Phone recipient sample",
         )
+        _request(
+            db,
+            request_id="22222222-2222-4222-8222-222222222208",
+            reference_code=f"PR-{day}-0008",
+            share_token="seed-share-cancel-target",
+            sender=ogulcan,
+            recipient_contact="ayca@example.com",
+            recipient_user=ayca,
+            amount_minor=4200,
+            status=PaymentRequestStatus.PENDING.value,
+            note="E2E cancel target",
+        )
+        _request(
+            db,
+            request_id="22222222-2222-4222-8222-222222222209",
+            reference_code=f"PR-{day}-0009",
+            share_token="seed-share-insufficient-mehmet",
+            sender=ogulcan,
+            recipient_contact="mehmet@example.com",
+            recipient_user=mehmet,
+            amount_minor=500_000,
+            status=PaymentRequestStatus.PENDING.value,
+            note="E2E insufficient balance target",
+        )
 
         db.commit()
-        print("Seed complete. Demo users:")
+        print("Seed complete (deterministic). Demo users (password: 1234):")
         print("  ogulcan@example.com, ayca@example.com, mehmet@example.com (+905551234567)")
-        print("Sample share URL (first pending ogulcan→ayca): log in and open dashboard.")
     finally:
         db.close()
 
 
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Seed the P2P payment request database")
+    parser.add_argument(
+        "--reset",
+        action="store_true",
+        help="Drop all tables and recreate seed data from scratch",
+    )
+    args = parser.parse_args()
+    seed(reset=args.reset)
+
+
 if __name__ == "__main__":
-    seed()
+    main()

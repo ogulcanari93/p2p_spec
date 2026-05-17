@@ -20,11 +20,19 @@ from app.models import (
 )
 from app.services import security
 from app.services.events import record_event
-from app.services.money import MoneyValidationError, normalize_currency, parse_amount_to_minor
+from app.services.expiration import expire_request_if_due, incoming_conditions_for_user
+from app.services.money import (
+    MoneyValidationError,
+    minor_to_decimal_string,
+    normalize_currency,
+    parse_amount_to_minor,
+)
+from app.services.wallets import get_default_wallet, wallet_can_cover_amount
 from app.services.payment_destinations import (
     get_default_destination,
     get_destination_for_user,
 )
+from app.services.reference_codes import allocate_reference_code
 
 
 def assert_pending_transition(current: str, target: str) -> None:
@@ -72,6 +80,18 @@ def create_payment_request(
     normalized_contact = security.normalize_contact(recipient_contact, contact_type)
     r_hash = security.contact_hash(recipient_contact, contact_type)
 
+    recipient_user_id = _resolve_recipient_user_id(db, r_hash)
+    if not recipient_user_id:
+        raise HTTPException(
+            status_code=422,
+            detail="No registered user found for this email or phone number.",
+        )
+    if recipient_user_id == sender.id:
+        raise HTTPException(
+            status_code=422,
+            detail="You cannot create a payment request to yourself.",
+        )
+
     if destination_id:
         destination = get_destination_for_user(db, sender, destination_id)
         if not destination:
@@ -93,11 +113,14 @@ def create_payment_request(
     share_token = secrets.token_urlsafe(16)
     snapshot = security.build_destination_snapshot(destination)
 
+    reference_code = allocate_reference_code(db, when=now)
+
     request = PaymentRequest(
         id=str(uuid.uuid4()),
+        reference_code=reference_code,
         share_token=share_token,
         sender_user_id=sender.id,
-        recipient_user_id=_resolve_recipient_user_id(db, r_hash),
+        recipient_user_id=recipient_user_id,
         recipient_contact=normalized_contact if contact_type.value == "EMAIL" else recipient_contact.strip(),
         recipient_contact_hash=r_hash,
         recipient_contact_type=contact_type.value,
@@ -128,13 +151,7 @@ def create_payment_request(
 
 
 def _incoming_conditions(viewer: User):
-    conditions = [
-        PaymentRequest.recipient_user_id == viewer.id,
-        PaymentRequest.recipient_contact_hash == viewer.email_hash,
-    ]
-    if viewer.phone_hash:
-        conditions.append(PaymentRequest.recipient_contact_hash == viewer.phone_hash)
-    return or_(*conditions)
+    return incoming_conditions_for_user(viewer)
 
 
 def _apply_status_filter(stmt, status: str | None):
@@ -149,6 +166,7 @@ def _apply_search(stmt, search: str | None):
     term = f"%{search.strip().lower()}%"
     return stmt.where(
         or_(
+            PaymentRequest.reference_code.ilike(term),
             PaymentRequest.recipient_contact.ilike(term),
             PaymentRequest.note.ilike(term),
             User.email.ilike(term),
@@ -265,6 +283,10 @@ def decline_payment_request(db: Session, request_id: str, actor: User) -> Paymen
     if not request:
         raise HTTPException(status_code=404, detail="Payment request not found.")
 
+    if expire_request_if_due(db, request):
+        db.commit()
+        db.refresh(request)
+
     if not is_recipient(request, actor):
         raise HTTPException(status_code=403, detail="Only the recipient can decline this request.")
 
@@ -309,6 +331,10 @@ def cancel_payment_request(db: Session, request_id: str, actor: User) -> Payment
     request = db.get(PaymentRequest, request_id)
     if not request:
         raise HTTPException(status_code=404, detail="Payment request not found.")
+
+    if expire_request_if_due(db, request):
+        db.commit()
+        db.refresh(request)
 
     if not is_sender(request, actor):
         raise HTTPException(status_code=403, detail="Only the sender can cancel this request.")
@@ -356,20 +382,23 @@ def get_payment_request_for_viewer(
     request = db.get(PaymentRequest, request_id)
     if not request or not can_view_request(request, viewer):
         raise HTTPException(status_code=404, detail="Payment request not found.")
+    if expire_request_if_due(db, request):
+        db.commit()
+        db.refresh(request)
     return request
 
 
 def get_public_share_view(db: Session, share_token: str):
     from app.schemas import PublicShareViewOut
+    from app.services.expiration import expire_pending_for_share_token
 
-    request = db.execute(
-        select(PaymentRequest).where(PaymentRequest.share_token == share_token)
-    ).scalar_one_or_none()
+    request = expire_pending_for_share_token(db, share_token)
     if not request:
         raise HTTPException(status_code=404, detail="Payment request not found.")
 
     sender = db.get(User, request.sender_user_id)
     return PublicShareViewOut(
+        reference_code=request.reference_code,
         status=request.status,
         amount_minor=request.amount_minor,
         currency=request.currency,
@@ -388,6 +417,10 @@ def pay_payment_request(db: Session, request_id: str, payer: User) -> PaymentReq
     request = db.get(PaymentRequest, request_id)
     if not request:
         raise HTTPException(status_code=404, detail="Payment request not found.")
+
+    if expire_request_if_due(db, request):
+        db.commit()
+        db.refresh(request)
 
     if request.sender_user_id == payer.id:
         raise HTTPException(status_code=403, detail="You cannot pay your own payment request.")
@@ -411,6 +444,18 @@ def pay_payment_request(db: Session, request_id: str, payer: User) -> PaymentReq
 
     if is_request_expired(request, now):
         raise HTTPException(status_code=422, detail="This payment request has expired.")
+
+    payer_wallet = get_default_wallet(db, payer, request.currency)
+    if not payer_wallet:
+        raise HTTPException(status_code=422, detail="Your wallet is not available to pay this request.")
+    if payer_wallet.status != "ACTIVE":
+        raise HTTPException(status_code=422, detail="Your wallet is not active.")
+    if not wallet_can_cover_amount(payer_wallet, request.amount_minor):
+        needed = minor_to_decimal_string(request.amount_minor, request.currency)
+        raise HTTPException(
+            status_code=422,
+            detail=f"Insufficient wallet balance. You need {needed} {request.currency} to pay this request.",
+        )
 
     existing_credit = db.execute(
         select(WalletTransaction).where(
@@ -444,6 +489,24 @@ def pay_payment_request(db: Session, request_id: str, payer: User) -> PaymentReq
         )
 
     db.refresh(request)
+
+    payer_wallet.balance_minor -= request.amount_minor
+    payer_wallet.available_balance_minor -= request.amount_minor
+    payer_wallet.updated_at = now
+
+    db.add(
+        WalletTransaction(
+            id=str(uuid.uuid4()),
+            wallet_id=payer_wallet.id,
+            payment_request_id=request.id,
+            direction=WalletTransactionDirection.DEBIT.value,
+            amount_minor=request.amount_minor,
+            currency=request.currency,
+            status="POSTED",
+            description=f"Payment sent for request {request.id[:8]}",
+            created_at=now,
+        )
+    )
 
     destination = db.get(PaymentDestination, request.destination_id)
     if not destination:

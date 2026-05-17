@@ -203,11 +203,11 @@
 - [X] T082 Implement full `backend/seed.py` — users ogulcan/ayca/mehmet; **at least one user with `phone` + `phone_hash`**; wallets, destinations; requests in all statuses including pre-expired PENDING; include phone-targeted incoming sample for tests (U3)
 - [X] T083 Update `backend/app/main.py` to serve `frontend/dist` static files and SPA fallback excluding `/api/*`
 - [X] T084 Complete `README.md` — product, stack, Spec-Kit workflow, security model, **`X-User-Email` prototype auth**, PostgreSQL note, local run, seed, Playwright videos path, Render/Railway deploy; **logging policy: application logs and audit events must not contain raw sensitive financial identifiers** — do not log full recipient contacts, wallet IDs on public paths, encrypted identifiers, or provider refs (G2); note services should avoid logging these fields (G2)
-- [ ] T085 [P] Create `e2e/playwright.config.ts` with `video: 'on'`, `webServer`, and a **mobile viewport project** (e.g. iPhone-sized) (G1)
-- [ ] T086 Implement `e2e/tests/payment-requests.spec.ts` — all 10 scenarios from `plan.md` **plus mobile viewport dashboard usability check** (G1)
-- [ ] T087 Run `specs/001-p2p-payment-request/quickstart.md` commands and fix any gaps
-- [ ] T088 [P] Add production build script notes in `README.md` — `npm run build` + `STATIC_DIR` uvicorn
-- [ ] T089 Align HTTP **403 / 404 / 422** responses across routers with `contracts/openapi.yaml` — user-friendly `detail`, no stack traces or internal IDs leaked (U5)
+- [X] T085 [P] Create `e2e/playwright.config.ts` with `video: 'on'`, `webServer`, and a **mobile viewport project** (e.g. iPhone-sized) (G1)
+- [X] T086 Implement `e2e/tests/payment-requests.spec.ts` — all 10 scenarios from `plan.md` **plus mobile viewport dashboard usability check** (G1)
+- [X] T087 Run `specs/001-p2p-payment-request/quickstart.md` commands and fix any gaps
+- [X] T088 [P] Add production build script notes in `README.md` — `npm run build` + `STATIC_DIR` uvicorn
+- [X] T089 Align HTTP **403 / 404 / 422** responses across routers with `contracts/openapi.yaml` — user-friendly `detail`, no stack traces or internal IDs leaked (U5)
 - [ ] T090 *(Process, C1)* Before final submission: run `/speckit-constitution` or update `.specify/memory/constitution.md` if project principles should be enforceable gates
 
 ---

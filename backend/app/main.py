@@ -1,15 +1,28 @@
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.config import settings
 from app.database import init_db
+from app.errors import (
+    http_exception_handler,
+    starlette_http_exception_handler,
+    unhandled_exception_handler,
+    validation_exception_handler,
+)
 from app.routers import auth, payment_requests, share, wallets
 
 app = FastAPI(title="P2P Payment Request API", version="0.1.0")
+
+app.add_exception_handler(HTTPException, http_exception_handler)
+app.add_exception_handler(StarletteHTTPException, starlette_http_exception_handler)
+app.add_exception_handler(RequestValidationError, validation_exception_handler)
+app.add_exception_handler(Exception, unhandled_exception_handler)
 
 app.add_middleware(
     CORSMiddleware,

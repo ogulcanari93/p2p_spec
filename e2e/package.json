@@ -3,7 +3,12 @@
   "private": true,
   "version": "0.1.0",
   "scripts": {
-    "test": "playwright test"
+    "test": "playwright test --project=chromium --project=mobile",
+    "test:desktop": "playwright test --project=chromium",
+    "test:mobile": "playwright test --project=mobile",
+    "test:ui": "playwright test --ui",
+    "report": "playwright show-report playwright-report",
+    "demo:record": "playwright test --project=demo"
   },
   "devDependencies": {
     "@playwright/test": "^1.49.0"

@@ -48,6 +48,7 @@ export function DestinationSelector({ currency, value, onChange }: Props) {
       <label htmlFor="destination">Payment destination</label>
       <select
         id="destination"
+        data-testid="destination-select"
         value={value}
         onChange={(e) => onChange(e.target.value)}
       >

@@ -1,10 +1,12 @@
 import { Link, Outlet } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
+import { RequestActionProvider } from "../context/RequestActionContext";
 
 export function Layout() {
   const { user, logout } = useAuth();
 
   return (
+    <RequestActionProvider>
     <div className="layout">
       <header className="layout__header">
         <div>
@@ -29,5 +31,6 @@ export function Layout() {
         <Outlet />
       </main>
     </div>
+    </RequestActionProvider>
   );
 }

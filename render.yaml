@@ -1,0 +1,24 @@
+# Render Blueprint — https://render.com/docs/blueprint-spec
+# After deploy, set LIVE_DEMO_URL in README to your service URL (e.g. https://p2p-payment-request.onrender.com)
+services:
+  - type: web
+    name: p2p-payment-request
+    runtime: python
+    plan: free
+    buildCommand: >-
+      cd frontend && npm ci && npm run build &&
+      cd ../backend && pip install -r requirements.txt
+    startCommand: >-
+      cd backend &&
+      mkdir -p data &&
+      python seed.py --reset &&
+      uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.0"
+      - key: STATIC_DIR
+        value: ../frontend/dist
+      - key: DATABASE_URL
+        value: sqlite:///./data/app.db
+      # RENDER_EXTERNAL_URL is injected automatically; config.py uses it for share links + CORS

@@ -9,15 +9,24 @@ import {
   type PaymentRequestDetail,
 } from "../api/client";
 import { AmountDisplay } from "../components/AmountDisplay";
+import { ReferenceCode } from "../components/ReferenceCode";
 import { EventHistory } from "../components/EventHistory";
 import { ExpirationCountdown } from "../components/ExpirationCountdown";
-import { LoadingButton } from "../components/LoadingButton";
 import { StatusBadge } from "../components/StatusBadge";
+import {
+  CANCEL_ACTION,
+  DECLINE_ACTION,
+  PAY_ACTION,
+  useRequestAction,
+} from "../context/RequestActionContext";
+import { resolveDisplayStatus } from "../utils/expiration";
 
 export function RequestDetailPage() {
   const { id } = useParams<{ id: string }>();
   const [request, setRequest] = useState<PaymentRequestDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const { runRequestAction, busy } = useRequestAction();
+
   useEffect(() => {
     if (!id) return;
     setError(null);
@@ -26,14 +35,16 @@ export function RequestDetailPage() {
       .catch((err) => setError(err instanceof ApiError ? err.message : "Failed to load request."));
   }, [id]);
 
-  const handleAction = async (action: () => Promise<PaymentRequestDetail>) => {
+  const handleAction = async (
+    config: typeof PAY_ACTION,
+    action: () => Promise<PaymentRequestDetail>,
+  ) => {
     if (!id) return;
     try {
-      const updated = await action();
+      const updated = await runRequestAction(config, action);
       setRequest(updated);
-    } catch (err) {
-      const message = err instanceof ApiError ? err.message : "Action failed.";
-      window.alert(message);
+    } catch {
+      /* alert handled in context */
     }
   };
 
@@ -56,8 +67,7 @@ export function RequestDetailPage() {
     );
   }
 
-  const displayStatus =
-    request.is_expired && request.status === "PENDING" ? "EXPIRED" : request.status;
+  const displayStatus = resolveDisplayStatus(request.status, request.is_expired);
 
   return (
     <div className="card request-detail">
@@ -65,12 +75,17 @@ export function RequestDetailPage() {
         <h1 style={{ marginTop: 0 }}>Request details</h1>
         <StatusBadge status={displayStatus} />
       </div>
+      <ReferenceCode code={request.reference_code} />
 
       <p style={{ fontSize: "1.5rem", margin: "0.5rem 0" }}>
         <AmountDisplay amountMinor={request.amount_minor} currency={request.currency} />
       </p>
 
-      <ExpirationCountdown expiresAt={request.expires_at} status={request.status} />
+      <ExpirationCountdown
+        expiresAt={request.expires_at}
+        status={request.status}
+        isExpired={request.is_expired}
+      />
 
       <dl className="request-detail__meta">
         <dt>Sender</dt>
@@ -105,28 +120,35 @@ export function RequestDetailPage() {
 
       <div className="request-actions" style={{ marginBottom: "1.5rem" }}>
         {request.can_pay && (
-          <LoadingButton
+          <button
+            type="button"
             className="btn btn--primary"
-            onClick={() => handleAction(() => payRequest(request.id))}
+            data-testid="detail-pay-button"
+            disabled={busy}
+            onClick={() => void handleAction(PAY_ACTION, () => payRequest(request.id))}
           >
             Pay
-          </LoadingButton>
+          </button>
         )}
         {request.can_decline && (
-          <LoadingButton
+          <button
+            type="button"
             className="btn btn--danger"
-            onClick={() => handleAction(() => declineRequest(request.id))}
+            disabled={busy}
+            onClick={() => void handleAction(DECLINE_ACTION, () => declineRequest(request.id))}
           >
             Decline
-          </LoadingButton>
+          </button>
         )}
         {request.can_cancel && (
-          <LoadingButton
+          <button
+            type="button"
             className="btn btn--secondary"
-            onClick={() => handleAction(() => cancelRequest(request.id))}
+            disabled={busy}
+            onClick={() => void handleAction(CANCEL_ACTION, () => cancelRequest(request.id))}
           >
             Cancel
-          </LoadingButton>
+          </button>
         )}
         <Link to="/dashboard" className="btn btn--secondary">
           Back to dashboard

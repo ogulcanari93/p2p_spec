@@ -37,11 +37,19 @@ export function LoadingButton({
     <button
       type="button"
       {...rest}
-      className={className}
+      className={`${className}${loading ? " btn--loading" : ""}`.trim()}
       disabled={disabled || loading}
       onClick={() => void handleClick()}
+      aria-busy={loading}
     >
-      {loading ? loadingLabel : children}
+      {loading ? (
+        <span className="btn__loading">
+          <span className="btn__spinner" aria-hidden />
+          {loadingLabel}
+        </span>
+      ) : (
+        children
+      )}
     </button>
   );
 }

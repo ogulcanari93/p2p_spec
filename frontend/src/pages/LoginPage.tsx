@@ -12,8 +12,8 @@ export function LoginPage() {
 
   return (
     <LoginForm
-      onSubmit={async (email) => {
-        await login(email);
+      onSubmit={async (email, password) => {
+        await login(email, password);
         navigate("/dashboard", { replace: true });
       }}
     />

@@ -22,6 +22,7 @@ export function SearchAndFilterBar({ status, search, onStatusChange, onSearchCha
           <label htmlFor="status-filter">Status</label>
           <select
             id="status-filter"
+            data-testid="status-filter"
             value={status}
             onChange={(e) => onStatusChange(e.target.value)}
           >
@@ -36,6 +37,7 @@ export function SearchAndFilterBar({ status, search, onStatusChange, onSearchCha
           <label htmlFor="request-search">Search</label>
           <input
             id="request-search"
+            data-testid="request-search"
             type="search"
             placeholder="Sender, recipient, or note…"
             value={search}
