@@ -6,12 +6,14 @@ A consumer fintech prototype for requesting money from friends—similar to **Ve
 
 | | |
 |---|---|
-| **Live demo** | Deploy with [docs/DEPLOY.md](docs/DEPLOY.md) — paste your URL here after Render deploy |
+| **Live demo** | https://p2p-payment-request.onrender.com/login |
 | **Demo video** | [docs/demo/walkthrough.webm](docs/demo/walkthrough.webm) (automated Playwright tour, ~2 min) |
 
 ### Quick try (no install)
 
-After the live demo is deployed, open the URL and sign in as `ayca@example.com` with password `1234`. Pay a pending incoming request, then sign in as `ogulcan@example.com` / `1234` to confirm it shows **Paid**. All seed users use password `1234`.
+Open the [live demo](https://p2p-payment-request.onrender.com/login) and sign in as `ayca@example.com` with password `1234`. Pay a pending incoming request, then sign in as `ogulcan@example.com` / `1234` to confirm it shows **Paid**. All seed users use password `1234`.
+
+> Free tier may cold-start after idle time (~30–60 s on first load).
 
 ---
 
@@ -130,13 +132,11 @@ Writes to `docs/demo/walkthrough.webm`.
 
 ---
 
-## Live demo (Render)
+## Live demo
 
-1. Push this repo to GitHub (public).
-2. Follow [docs/DEPLOY.md](docs/DEPLOY.md): Render → **New Blueprint** → select repo → apply `render.yaml`.
-3. Copy the service URL (e.g. `https://p2p-payment-request.onrender.com`) into the table at the top of this README.
+**URL:** https://p2p-payment-request.onrender.com/login
 
-Free tier may **cold-start** (~30–60 s) after idle time. Each deploy re-seeds demo data.
+Hosted on [Render](https://render.com) via [render.yaml](render.yaml). Each deploy re-seeds demo data. To redeploy or change hosting, see [docs/DEPLOY.md](docs/DEPLOY.md).
 
 ---
 
