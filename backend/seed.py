@@ -1,0 +1,7 @@
+"""Initialize database schema. Full demo seed data is added in Polish phase (T082)."""
+
+from app.database import init_db
+
+if __name__ == "__main__":
+    init_db()
+    print("Database initialized.")
