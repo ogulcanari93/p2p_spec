@@ -4,6 +4,7 @@ import { Layout } from "./components/Layout";
 import { CreateRequestPage } from "./pages/CreateRequestPage";
 import { DashboardPage } from "./pages/DashboardPage";
 import { LoginPage } from "./pages/LoginPage";
+import { RequestDetailPlaceholder } from "./pages/RequestDetailPlaceholder";
 
 function ProtectedRoute() {
   const { user, loading } = useAuth();
@@ -24,6 +25,7 @@ export default function App() {
         <Route element={<Layout />}>
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/requests/new" element={<CreateRequestPage />} />
+          <Route path="/requests/:id" element={<RequestDetailPlaceholder />} />
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
         </Route>
       </Route>

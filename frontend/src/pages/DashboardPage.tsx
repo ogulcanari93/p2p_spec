@@ -1,61 +1,114 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { ApiError, fetchOutgoingRequests, type PaymentRequestSummary } from "../api/client";
-import { AmountDisplay } from "../components/AmountDisplay";
-import { StatusBadge } from "../components/StatusBadge";
+import { ApiError, fetchRequests, type PaymentRequestSummary } from "../api/client";
+import { EmptyState } from "../components/EmptyState";
+import { RequestCard } from "../components/RequestCard";
+import { RequestTable } from "../components/RequestTable";
+import { SearchAndFilterBar } from "../components/SearchAndFilterBar";
+import { WalletSummary } from "../components/WalletSummary";
 
-/** Minimal dashboard shell for US1 — full dashboard in US2. */
+function RequestSection({
+  title,
+  description,
+  requests,
+  direction,
+  loading,
+}: {
+  title: string;
+  description: string;
+  requests: PaymentRequestSummary[];
+  direction: "incoming" | "outgoing";
+  loading: boolean;
+}) {
+  return (
+    <section className="card dashboard-section">
+      <h2 style={{ marginTop: 0 }}>{title}</h2>
+      <p style={{ color: "var(--muted)", marginTop: 0 }}>{description}</p>
+      {loading && <p style={{ color: "var(--muted)" }}>Loading…</p>}
+      {!loading && requests.length === 0 && (
+        <EmptyState
+          title={`No ${direction} requests`}
+          description="Try changing the status filter or search, or create a new request."
+        />
+      )}
+      {!loading && requests.length > 0 && (
+        <>
+          <RequestTable requests={requests} direction={direction} />
+          <div className="request-card-list hide-desktop">
+            {requests.map((r) => (
+              <RequestCard key={r.id} request={r} direction={direction} />
+            ))}
+          </div>
+        </>
+      )}
+    </section>
+  );
+}
+
 export function DashboardPage() {
+  const [status, setStatus] = useState("all");
+  const [searchInput, setSearchInput] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
   const [outgoing, setOutgoing] = useState<PaymentRequestSummary[]>([]);
+  const [incoming, setIncoming] = useState<PaymentRequestSummary[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchOutgoingRequests()
-      .then((data) => setOutgoing(data.outgoing))
+    const timer = window.setTimeout(() => setSearchQuery(searchInput.trim()), 300);
+    return () => window.clearTimeout(timer);
+  }, [searchInput]);
+
+  useEffect(() => {
+    setLoading(true);
+    setError(null);
+    fetchRequests({ status, search: searchQuery || undefined })
+      .then((data) => {
+        setOutgoing(data.outgoing);
+        setIncoming(data.incoming);
+      })
       .catch((err) => setError(err instanceof ApiError ? err.message : "Failed to load requests"))
       .finally(() => setLoading(false));
-  }, []);
+  }, [status, searchQuery]);
 
   return (
-    <div>
-      <div className="card" style={{ marginBottom: "1rem" }}>
-        <h1>Dashboard</h1>
+    <div className="dashboard">
+      <div className="dashboard__header card">
+        <h1 style={{ marginTop: 0 }}>Dashboard</h1>
         <p style={{ color: "var(--muted)", marginTop: 0 }}>
-          Welcome. Create a request or review your outgoing requests below.
+          Manage incoming and outgoing payment requests.
         </p>
         <Link to="/requests/new" className="btn btn--primary">
           New request
         </Link>
       </div>
 
-      <section className="card">
-        <h2>Outgoing requests</h2>
-        {loading && <p style={{ color: "var(--muted)" }}>Loading…</p>}
-        {error && <p className="form-error">{error}</p>}
-        {!loading && !error && outgoing.length === 0 && (
-          <p style={{ color: "var(--muted)" }}>No outgoing requests yet.</p>
-        )}
-        {!loading && outgoing.length > 0 && (
-          <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
-            {outgoing.map((r) => (
-              <li
-                key={r.id}
-                style={{
-                  padding: "0.75rem 0",
-                  borderBottom: "1px solid var(--border)",
-                }}
-              >
-                <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem", alignItems: "center" }}>
-                  <AmountDisplay amountMinor={r.amount_minor} currency={r.currency} />
-                  <StatusBadge status={r.status} />
-                  <span style={{ color: "var(--muted)" }}>→ {r.recipient_contact}</span>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+      <WalletSummary />
+
+      <SearchAndFilterBar
+        status={status}
+        search={searchInput}
+        onStatusChange={setStatus}
+        onSearchChange={setSearchInput}
+      />
+
+      {error && <p className="form-error card">{error}</p>}
+
+      <RequestSection
+        title="Incoming requests"
+        description="Requests others sent to you."
+        requests={incoming}
+        direction="incoming"
+        loading={loading}
+      />
+
+      <RequestSection
+        title="Outgoing requests"
+        description="Requests you sent to others."
+        requests={outgoing}
+        direction="outgoing"
+        loading={loading}
+      />
     </div>
   );
 }

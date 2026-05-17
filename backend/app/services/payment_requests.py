@@ -4,7 +4,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 
 from fastapi import HTTPException
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from app.config import settings
@@ -118,13 +118,75 @@ def create_payment_request(
     return request
 
 
-def list_outgoing_requests(db: Session, sender: User) -> list[PaymentRequest]:
-    stmt = (
-        select(PaymentRequest)
-        .where(PaymentRequest.sender_user_id == sender.id)
-        .order_by(PaymentRequest.created_at.desc())
+def _incoming_conditions(viewer: User):
+    conditions = [
+        PaymentRequest.recipient_user_id == viewer.id,
+        PaymentRequest.recipient_contact_hash == viewer.email_hash,
+    ]
+    if viewer.phone_hash:
+        conditions.append(PaymentRequest.recipient_contact_hash == viewer.phone_hash)
+    return or_(*conditions)
+
+
+def _apply_status_filter(stmt, status: str | None):
+    if status and status.lower() != "all":
+        return stmt.where(PaymentRequest.status == status.upper())
+    return stmt
+
+
+def _apply_search(stmt, search: str | None):
+    if not search or not search.strip():
+        return stmt
+    term = f"%{search.strip().lower()}%"
+    return stmt.where(
+        or_(
+            PaymentRequest.recipient_contact.ilike(term),
+            PaymentRequest.note.ilike(term),
+            User.email.ilike(term),
+        )
     )
-    return list(db.execute(stmt).scalars().all())
+
+
+def list_payment_requests(
+    db: Session,
+    viewer: User,
+    *,
+    direction: str = "all",
+    status: str | None = "all",
+    search: str | None = None,
+) -> tuple[list[PaymentRequest], list[PaymentRequest]]:
+    """Return (outgoing, incoming) payment requests for the viewer."""
+    outgoing: list[PaymentRequest] = []
+    incoming: list[PaymentRequest] = []
+
+    if direction in ("outgoing", "all"):
+        stmt = (
+            select(PaymentRequest)
+            .join(User, PaymentRequest.sender_user_id == User.id)
+            .where(PaymentRequest.sender_user_id == viewer.id)
+            .order_by(PaymentRequest.created_at.desc())
+        )
+        stmt = _apply_status_filter(stmt, status)
+        stmt = _apply_search(stmt, search)
+        outgoing = list(db.execute(stmt).unique().scalars().all())
+
+    if direction in ("incoming", "all"):
+        stmt = (
+            select(PaymentRequest)
+            .join(User, PaymentRequest.sender_user_id == User.id)
+            .where(_incoming_conditions(viewer))
+            .order_by(PaymentRequest.created_at.desc())
+        )
+        stmt = _apply_status_filter(stmt, status)
+        stmt = _apply_search(stmt, search)
+        incoming = list(db.execute(stmt).unique().scalars().all())
+
+    return outgoing, incoming
+
+
+def list_outgoing_requests(db: Session, sender: User) -> list[PaymentRequest]:
+    outgoing, _ = list_payment_requests(db, sender, direction="outgoing")
+    return outgoing
 
 
 def share_url(share_token: str) -> str:

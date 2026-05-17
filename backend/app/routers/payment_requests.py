@@ -6,7 +6,8 @@ from app.database import get_db
 from app.models import User
 from app.schemas import CreatePaymentRequestIn, CreatePaymentRequestResponse, PaymentRequestListOut
 from app.serializers import request_to_detail, request_to_summary
-from app.services.payment_requests import create_payment_request, list_outgoing_requests, share_url
+from app.services.expiration import expire_pending_for_user
+from app.services.payment_requests import create_payment_request, list_payment_requests, share_url
 
 router = APIRouter(prefix="/api/requests", tags=["payment-requests"])
 
@@ -30,14 +31,40 @@ def post_request(
     return CreatePaymentRequestResponse(request=detail, share_url=share_url(request.share_token))
 
 
+def _summaries_for_requests(db: Session, rows: list, viewer: User) -> list:
+    sender_ids = {r.sender_user_id for r in rows}
+    senders = {}
+    if sender_ids:
+        from sqlalchemy import select as sa_select
+
+        from app.models import User as UserModel
+
+        for user in db.execute(sa_select(UserModel).where(UserModel.id.in_(sender_ids))).scalars():
+            senders[user.id] = user.email
+
+    return [
+        request_to_summary(r, viewer=viewer, sender_email=senders.get(r.sender_user_id))
+        for r in rows
+    ]
+
+
 @router.get("", response_model=PaymentRequestListOut)
 def list_requests(
     direction: str = Query(default="all"),
+    status: str = Query(default="all"),
+    search: str | None = Query(default=None),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> PaymentRequestListOut:
-    outgoing: list = []
-    if direction in ("outgoing", "all"):
-        rows = list_outgoing_requests(db, current_user)
-        outgoing = [request_to_summary(r, viewer=current_user) for r in rows]
-    return PaymentRequestListOut(outgoing=outgoing, incoming=[])
+    expire_pending_for_user(db, current_user)
+    outgoing_rows, incoming_rows = list_payment_requests(
+        db,
+        current_user,
+        direction=direction,
+        status=status,
+        search=search,
+    )
+    return PaymentRequestListOut(
+        outgoing=_summaries_for_requests(db, outgoing_rows, current_user),
+        incoming=_summaries_for_requests(db, incoming_rows, current_user),
+    )

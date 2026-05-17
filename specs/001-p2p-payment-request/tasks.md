@@ -113,17 +113,17 @@
 
 ### Implementation for User Story 2
 
-- [ ] T049 [US2] Implement full `list_payment_requests()` in `backend/app/services/payment_requests.py` — direction, status, search; incoming match by **`email_hash` or `phone_hash`** and `recipient_user_id` (U3)
-- [ ] T050 [US2] Call `expire_pending_for_user()` before list response in `backend/app/routers/payment_requests.py`
-- [ ] T051 [US2] Implement `GET /api/requests` and `GET /api/wallets/me` response shaping with `can_pay`/`can_decline`/`can_cancel` flags in `backend/app/schemas.py`
-- [ ] T052 [P] [US2] Create `frontend/src/components/WalletSummary.tsx` and `frontend/src/pages/DashboardPage.tsx`
-- [ ] T053 [P] [US2] Create `frontend/src/components/SearchAndFilterBar.tsx` for status and search query params
-- [ ] T054 [P] [US2] Create `frontend/src/components/RequestTable.tsx` for desktop layout (D1)
-- [ ] T055 [P] [US2] Create `frontend/src/components/RequestCard.tsx` for mobile layout
-- [ ] T056 [US2] Create `frontend/src/components/EmptyState.tsx` and integrate into `frontend/src/pages/DashboardPage.tsx`
-- [ ] T057 [US2] Add responsive CSS in `frontend/src/styles/global.css` — table vs cards breakpoint
-- [ ] T058 [US2] Wire `/dashboard` route with protected guard in `frontend/src/App.tsx`
-- [ ] T059 [US2] In `RequestTable.tsx` and `RequestCard.tsx`, render Pending-row actions: **incoming** → Pay, Decline, View Details; **outgoing** → Cancel, View Details; wire to **safe stub handlers** (disabled/loading/no-op or navigate to detail) until US3/US4 connect APIs (I1)
+- [X] T049 [US2] Implement full `list_payment_requests()` in `backend/app/services/payment_requests.py` — direction, status, search; incoming match by **`email_hash` or `phone_hash`** and `recipient_user_id` (U3)
+- [X] T050 [US2] Call `expire_pending_for_user()` before list response in `backend/app/routers/payment_requests.py`
+- [X] T051 [US2] Implement `GET /api/requests` and `GET /api/wallets/me` response shaping with `can_pay`/`can_decline`/`can_cancel` flags in `backend/app/schemas.py`
+- [X] T052 [P] [US2] Create `frontend/src/components/WalletSummary.tsx` and `frontend/src/pages/DashboardPage.tsx`
+- [X] T053 [P] [US2] Create `frontend/src/components/SearchAndFilterBar.tsx` for status and search query params
+- [X] T054 [P] [US2] Create `frontend/src/components/RequestTable.tsx` for desktop layout (D1)
+- [X] T055 [P] [US2] Create `frontend/src/components/RequestCard.tsx` for mobile layout
+- [X] T056 [US2] Create `frontend/src/components/EmptyState.tsx` and integrate into `frontend/src/pages/DashboardPage.tsx`
+- [X] T057 [US2] Add responsive CSS in `frontend/src/styles/global.css` — table vs cards breakpoint
+- [X] T058 [US2] Wire `/dashboard` route with protected guard in `frontend/src/App.tsx`
+- [X] T059 [US2] In `RequestTable.tsx` and `RequestCard.tsx`, render Pending-row actions: **incoming** → Pay, Decline, View Details; **outgoing** → Cancel, View Details; wire to **safe stub handlers** (disabled/loading/no-op or navigate to detail) until US3/US4 connect APIs (I1)
 
 **Checkpoint**: Dashboard shows wallet, filtered lists, correct **visible** action buttons by status; Pay/Decline/Cancel may be stubs
 

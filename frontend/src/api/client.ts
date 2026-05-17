@@ -65,6 +65,16 @@ export type User = {
   created_at: string;
 };
 
+export type Wallet = {
+  id: string;
+  currency: string;
+  wallet_type: string;
+  display_name: string | null;
+  balance_minor: number;
+  available_balance_minor: number;
+  status: string;
+};
+
 export type PaymentDestination = {
   id: string;
   destination_type: string;
@@ -75,6 +85,13 @@ export type PaymentDestination = {
   is_default: boolean;
 };
 
+export type DestinationSnapshot = {
+  destination_type: string;
+  display_label: string;
+  masked_identifier: string | null;
+  currency: string;
+};
+
 export type PaymentRequestSummary = {
   id: string;
   share_token: string;
@@ -83,9 +100,15 @@ export type PaymentRequestSummary = {
   currency: string;
   note: string | null;
   recipient_contact: string;
+  recipient_contact_type: string;
   counterparty_label: string;
+  destination_snapshot: DestinationSnapshot;
   created_at: string;
   expires_at: string;
+  is_expired: boolean;
+  can_pay: boolean;
+  can_decline: boolean;
+  can_cancel: boolean;
 };
 
 export type PaymentRequestDetail = PaymentRequestSummary & {
@@ -97,6 +120,11 @@ export type CreateRequestResponse = {
   share_url: string;
 };
 
+export type PaymentRequestList = {
+  outgoing: PaymentRequestSummary[];
+  incoming: PaymentRequestSummary[];
+};
+
 export function login(email: string) {
   return apiFetch<{ user: User }>("/api/auth/login", {
     method: "POST",
@@ -106,6 +134,10 @@ export function login(email: string) {
 
 export function fetchMe() {
   return apiFetch<User>("/api/auth/me");
+}
+
+export function fetchWallet() {
+  return apiFetch<Wallet>("/api/wallets/me");
 }
 
 export function fetchDestinations() {
@@ -125,8 +157,20 @@ export function createRequest(payload: {
   });
 }
 
+export function fetchRequests(params?: {
+  direction?: string;
+  status?: string;
+  search?: string;
+}) {
+  const qs = new URLSearchParams();
+  if (params?.direction) qs.set("direction", params.direction);
+  if (params?.status && params.status !== "all") qs.set("status", params.status);
+  if (params?.search) qs.set("search", params.search);
+  const query = qs.toString();
+  return apiFetch<PaymentRequestList>(`/api/requests${query ? `?${query}` : ""}`);
+}
+
+/** @deprecated Use fetchRequests instead */
 export function fetchOutgoingRequests() {
-  return apiFetch<{ outgoing: PaymentRequestSummary[]; incoming: PaymentRequestSummary[] }>(
-    "/api/requests?direction=outgoing",
-  );
+  return fetchRequests({ direction: "outgoing" });
 }
