@@ -13,7 +13,10 @@ from app.schemas import (
 from app.serializers import request_to_detail, request_to_summary
 from app.services.expiration import expire_pending_for_user
 from app.services.payment_requests import (
+    cancel_payment_request,
     create_payment_request,
+    decline_payment_request,
+    get_payment_request_for_viewer,
     list_payment_requests,
     pay_payment_request,
     share_url,
@@ -80,6 +83,18 @@ def list_requests(
     )
 
 
+@router.get("/{request_id}", response_model=PaymentRequestDetailOut)
+def get_request(
+    request_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> PaymentRequestDetailOut:
+    expire_pending_for_user(db, current_user)
+    request = get_payment_request_for_viewer(db, request_id, current_user)
+    sender = db.get(User, request.sender_user_id)
+    return request_to_detail(db, request, viewer=current_user, sender=sender)
+
+
 @router.post("/{request_id}/pay", response_model=PaymentRequestDetailOut)
 def post_pay_request(
     request_id: str,
@@ -88,5 +103,29 @@ def post_pay_request(
 ) -> PaymentRequestDetailOut:
     expire_pending_for_user(db, current_user)
     request = pay_payment_request(db, request_id, current_user)
+    sender = db.get(User, request.sender_user_id)
+    return request_to_detail(db, request, viewer=current_user, sender=sender)
+
+
+@router.post("/{request_id}/decline", response_model=PaymentRequestDetailOut)
+def post_decline_request(
+    request_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> PaymentRequestDetailOut:
+    expire_pending_for_user(db, current_user)
+    request = decline_payment_request(db, request_id, current_user)
+    sender = db.get(User, request.sender_user_id)
+    return request_to_detail(db, request, viewer=current_user, sender=sender)
+
+
+@router.post("/{request_id}/cancel", response_model=PaymentRequestDetailOut)
+def post_cancel_request(
+    request_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> PaymentRequestDetailOut:
+    expire_pending_for_user(db, current_user)
+    request = cancel_payment_request(db, request_id, current_user)
     sender = db.get(User, request.sender_user_id)
     return request_to_detail(db, request, viewer=current_user, sender=sender)

@@ -111,8 +111,42 @@ export type PaymentRequestSummary = {
   can_cancel: boolean;
 };
 
+export type Sender = {
+  id: string;
+  email: string;
+  display_name: string | null;
+};
+
+export type RequestEvent = {
+  id: string;
+  event_type: string;
+  previous_status: string | null;
+  new_status: string | null;
+  created_at: string;
+  actor_user_id: string | null;
+};
+
 export type PaymentRequestDetail = PaymentRequestSummary & {
+  sender: Sender | null;
+  recipient_user_id: string | null;
+  paid_at: string | null;
+  declined_at: string | null;
+  cancelled_at: string | null;
+  expired_at: string | null;
   share_url: string;
+  events: RequestEvent[];
+};
+
+export type PublicShareView = {
+  status: string;
+  amount_minor: number;
+  currency: string;
+  note: string | null;
+  sender_display: string;
+  recipient_contact_masked: string;
+  created_at: string;
+  expires_at: string;
+  share_token: string;
 };
 
 export type CreateRequestResponse = {
@@ -157,8 +191,24 @@ export function createRequest(payload: {
   });
 }
 
+export function fetchRequestDetail(id: string) {
+  return apiFetch<PaymentRequestDetail>(`/api/requests/${id}`);
+}
+
 export function payRequest(id: string) {
   return apiFetch<PaymentRequestDetail>(`/api/requests/${id}/pay`, { method: "POST" });
+}
+
+export function declineRequest(id: string) {
+  return apiFetch<PaymentRequestDetail>(`/api/requests/${id}/decline`, { method: "POST" });
+}
+
+export function cancelRequest(id: string) {
+  return apiFetch<PaymentRequestDetail>(`/api/requests/${id}/cancel`, { method: "POST" });
+}
+
+export function fetchPublicShare(shareToken: string) {
+  return apiFetch<PublicShareView>(`/api/share/${shareToken}`);
 }
 
 export function fetchRequests(params?: {

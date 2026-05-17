@@ -1,12 +1,14 @@
 from datetime import datetime, timezone
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import PaymentRequest, User
+from app.models import PaymentRequest, RequestEvent, User
 from app.schemas import (
     DestinationSnapshotOut,
     PaymentRequestDetailOut,
     PaymentRequestSummaryOut,
+    RequestEventOut,
     SenderOut,
 )
 from app.services.payment_requests import parse_destination_snapshot, share_url
@@ -86,6 +88,14 @@ def request_to_detail(
         viewer=viewer,
         sender_email=sender_user.email if sender_user else None,
     )
+    events = list(
+        db.execute(
+            select(RequestEvent)
+            .where(RequestEvent.payment_request_id == request.id)
+            .order_by(RequestEvent.created_at.asc())
+        ).scalars().all()
+    )
+
     data = summary.model_dump()
     data.update(
         {
@@ -96,7 +106,7 @@ def request_to_detail(
             "cancelled_at": request.cancelled_at,
             "expired_at": request.expired_at,
             "share_url": share_url(request.share_token),
-            "events": [],
+            "events": [RequestEventOut.model_validate(event) for event in events],
         }
     )
     return PaymentRequestDetailOut(**data)

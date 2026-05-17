@@ -127,3 +127,15 @@ class CreatePaymentRequestResponse(BaseModel):
 class PaymentRequestListOut(BaseModel):
     outgoing: list[PaymentRequestSummaryOut] = []
     incoming: list[PaymentRequestSummaryOut] = []
+
+
+class PublicShareViewOut(BaseModel):
+    status: str
+    amount_minor: int
+    currency: str
+    note: str | None = None
+    sender_display: str
+    recipient_contact_masked: str
+    created_at: datetime
+    expires_at: datetime
+    share_token: str

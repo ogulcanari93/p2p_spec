@@ -198,6 +198,36 @@ def list_outgoing_requests(db: Session, sender: User) -> list[PaymentRequest]:
     return outgoing
 
 
+def is_sender(request: PaymentRequest, user: User) -> bool:
+    return request.sender_user_id == user.id
+
+
+def can_view_request(request: PaymentRequest, viewer: User) -> bool:
+    return is_sender(request, viewer) or is_recipient(request, viewer)
+
+
+def mask_recipient_contact(contact: str, contact_type: str) -> str:
+    if contact_type == "EMAIL" and "@" in contact:
+        local, domain = contact.split("@", 1)
+        masked_local = local[0] + "***" if local else "***"
+        return f"{masked_local}@{domain}"
+    if len(contact) > 4:
+        return f"{contact[:2]}***{contact[-2:]}"
+    return "***"
+
+
+def sender_display_name(sender: User | None) -> str:
+    if not sender:
+        return "Unknown sender"
+    if sender.display_name:
+        return sender.display_name
+    email = sender.email
+    if "@" in email:
+        local, domain = email.split("@", 1)
+        return f"{local[0]}***@{domain}"
+    return email
+
+
 def is_recipient(request: PaymentRequest, user: User) -> bool:
     return bool(
         request.recipient_user_id == user.id
@@ -218,6 +248,142 @@ def is_request_expired(request: PaymentRequest, now: datetime | None = None) -> 
     return request.status == PaymentRequestStatus.PENDING.value and expires <= now
 
 
+def _ensure_pending_not_expired(request: PaymentRequest, now: datetime) -> None:
+    if request.status == PaymentRequestStatus.EXPIRED.value:
+        raise HTTPException(status_code=422, detail="This payment request has expired.")
+    if request.status != PaymentRequestStatus.PENDING.value:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Cannot modify a request with status {request.status}.",
+        )
+    if is_request_expired(request, now):
+        raise HTTPException(status_code=422, detail="This payment request has expired.")
+
+
+def decline_payment_request(db: Session, request_id: str, actor: User) -> PaymentRequest:
+    request = db.get(PaymentRequest, request_id)
+    if not request:
+        raise HTTPException(status_code=404, detail="Payment request not found.")
+
+    if not is_recipient(request, actor):
+        raise HTTPException(status_code=403, detail="Only the recipient can decline this request.")
+
+    now = datetime.now(timezone.utc)
+    _ensure_pending_not_expired(request, now)
+
+    previous_status = request.status
+    update_result = db.execute(
+        update(PaymentRequest)
+        .where(
+            PaymentRequest.id == request_id,
+            PaymentRequest.status == PaymentRequestStatus.PENDING.value,
+        )
+        .values(
+            status=PaymentRequestStatus.DECLINED.value,
+            declined_at=now,
+            updated_at=now,
+        )
+    )
+    if update_result.rowcount == 0:
+        db.refresh(request)
+        raise HTTPException(
+            status_code=422,
+            detail=f"Cannot decline a request with status {request.status}.",
+        )
+
+    db.refresh(request)
+    record_event(
+        db,
+        payment_request_id=request.id,
+        event_type=RequestEventType.REQUEST_DECLINED,
+        actor_user_id=actor.id,
+        previous_status=previous_status,
+        new_status=PaymentRequestStatus.DECLINED.value,
+    )
+    db.commit()
+    db.refresh(request)
+    return request
+
+
+def cancel_payment_request(db: Session, request_id: str, actor: User) -> PaymentRequest:
+    request = db.get(PaymentRequest, request_id)
+    if not request:
+        raise HTTPException(status_code=404, detail="Payment request not found.")
+
+    if not is_sender(request, actor):
+        raise HTTPException(status_code=403, detail="Only the sender can cancel this request.")
+
+    now = datetime.now(timezone.utc)
+    _ensure_pending_not_expired(request, now)
+
+    previous_status = request.status
+    update_result = db.execute(
+        update(PaymentRequest)
+        .where(
+            PaymentRequest.id == request_id,
+            PaymentRequest.status == PaymentRequestStatus.PENDING.value,
+        )
+        .values(
+            status=PaymentRequestStatus.CANCELLED.value,
+            cancelled_at=now,
+            updated_at=now,
+        )
+    )
+    if update_result.rowcount == 0:
+        db.refresh(request)
+        raise HTTPException(
+            status_code=422,
+            detail=f"Cannot cancel a request with status {request.status}.",
+        )
+
+    db.refresh(request)
+    record_event(
+        db,
+        payment_request_id=request.id,
+        event_type=RequestEventType.REQUEST_CANCELLED,
+        actor_user_id=actor.id,
+        previous_status=previous_status,
+        new_status=PaymentRequestStatus.CANCELLED.value,
+    )
+    db.commit()
+    db.refresh(request)
+    return request
+
+
+def get_payment_request_for_viewer(
+    db: Session, request_id: str, viewer: User
+) -> PaymentRequest:
+    request = db.get(PaymentRequest, request_id)
+    if not request or not can_view_request(request, viewer):
+        raise HTTPException(status_code=404, detail="Payment request not found.")
+    return request
+
+
+def get_public_share_view(db: Session, share_token: str):
+    from app.schemas import PublicShareViewOut
+
+    request = db.execute(
+        select(PaymentRequest).where(PaymentRequest.share_token == share_token)
+    ).scalar_one_or_none()
+    if not request:
+        raise HTTPException(status_code=404, detail="Payment request not found.")
+
+    sender = db.get(User, request.sender_user_id)
+    return PublicShareViewOut(
+        status=request.status,
+        amount_minor=request.amount_minor,
+        currency=request.currency,
+        note=request.note,
+        sender_display=sender_display_name(sender),
+        recipient_contact_masked=mask_recipient_contact(
+            request.recipient_contact, request.recipient_contact_type
+        ),
+        created_at=request.created_at,
+        expires_at=request.expires_at,
+        share_token=request.share_token,
+    )
+
+
 def pay_payment_request(db: Session, request_id: str, payer: User) -> PaymentRequest:
     request = db.get(PaymentRequest, request_id)
     if not request:
@@ -233,6 +399,9 @@ def pay_payment_request(db: Session, request_id: str, payer: User) -> PaymentReq
 
     if request.status == PaymentRequestStatus.PAID.value:
         raise HTTPException(status_code=409, detail="This payment request has already been paid.")
+
+    if request.status == PaymentRequestStatus.EXPIRED.value:
+        raise HTTPException(status_code=422, detail="This payment request has expired.")
 
     if request.status != PaymentRequestStatus.PENDING.value:
         raise HTTPException(

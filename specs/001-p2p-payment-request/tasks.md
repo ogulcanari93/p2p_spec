@@ -159,22 +159,22 @@
 
 ### Tests for User Story 4
 
-- [ ] T066 [P] [US4] Add terminal-state transition rejection tests in `backend/tests/test_payment_requests.py`
-- [ ] T067 [P] [US4] Add wrong-destination `403` test for `POST /api/requests` in `backend/tests/test_payment_requests.py`
+- [X] T066 [P] [US4] Add terminal-state transition rejection tests in `backend/tests/test_payment_requests.py`
+- [X] T067 [P] [US4] Add wrong-destination `403` test for `POST /api/requests` in `backend/tests/test_payment_requests.py`
 
 ### Implementation for User Story 4
 
-- [ ] T068 [US4] Implement `decline_payment_request()` and `cancel_payment_request()` in `backend/app/services/payment_requests.py`
-- [ ] T069 [US4] Implement `POST /api/requests/{id}/decline` and `POST /api/requests/{id}/cancel` in `backend/app/routers/payment_requests.py`
-- [ ] T070 [US4] Implement `get_payment_request_detail()` with events in `backend/app/services/payment_requests.py`
-- [ ] T071 [US4] Implement `GET /api/requests/{id}` in `backend/app/routers/payment_requests.py`
-- [ ] T072 [US4] Implement `get_public_share_view()` returning `PublicShareView` schema only in `backend/app/services/payment_requests.py`
-- [ ] T073 [US4] Implement `GET /api/share/{share_token}` in `backend/app/routers/payment_requests.py`
-- [ ] T074 [P] [US4] Create `frontend/src/components/ExpirationCountdown.tsx` for Pending requests
-- [ ] T075 [US4] Create `frontend/src/pages/RequestDetailPage.tsx` with actions, events, share link, countdown
-- [ ] T076 [P] [US4] Create `frontend/src/pages/ShareRequestPage.tsx` at route `/r/:shareToken`
-- [ ] T077 [US4] Wire `/requests/:id` and `/r/:shareToken` in `frontend/src/App.tsx`
-- [ ] T078 [US4] Connect dashboard **Decline/Cancel** stubs and detail-page actions to decline/cancel APIs (replaces US2 stubs) (I1)
+- [X] T068 [US4] Implement `decline_payment_request()` and `cancel_payment_request()` in `backend/app/services/payment_requests.py`
+- [X] T069 [US4] Implement `POST /api/requests/{id}/decline` and `POST /api/requests/{id}/cancel` in `backend/app/routers/payment_requests.py`
+- [X] T070 [US4] Implement `get_payment_request_detail()` with events in `backend/app/services/payment_requests.py`
+- [X] T071 [US4] Implement `GET /api/requests/{id}` in `backend/app/routers/payment_requests.py`
+- [X] T072 [US4] Implement `get_public_share_view()` returning `PublicShareView` schema only in `backend/app/services/payment_requests.py`
+- [X] T073 [US4] Implement `GET /api/share/{share_token}` in `backend/app/routers/payment_requests.py`
+- [X] T074 [P] [US4] Create `frontend/src/components/ExpirationCountdown.tsx` for Pending requests
+- [X] T075 [US4] Create `frontend/src/pages/RequestDetailPage.tsx` with actions, events, share link, countdown
+- [X] T076 [P] [US4] Create `frontend/src/pages/ShareRequestPage.tsx` at route `/r/:shareToken`
+- [X] T077 [US4] Wire `/requests/:id` and `/r/:shareToken` in `frontend/src/App.tsx`
+- [X] T078 [US4] Connect dashboard **Decline/Cancel** stubs and detail-page actions to decline/cancel APIs (replaces US2 stubs) (I1)
 
 **Checkpoint**: Decline, cancel, detail, and public share flows work; terminal requests hide action buttons
 
@@ -188,9 +188,9 @@
 
 ### Implementation for User Story 5
 
-- [ ] T079 [US5] Integrate `expire_pending_for_user()` in `GET /api/requests/{id}` and all mutation handlers in `backend/app/routers/payment_requests.py`
-- [ ] T080 [US5] Return `422` with clear message when pay/decline/cancel attempted on EXPIRED in `backend/app/services/payment_requests.py`
-- [ ] T081 [US5] Ensure `ExpirationCountdown.tsx` reflects server `expires_at` on `frontend/src/pages/RequestDetailPage.tsx`
+- [X] T079 [US5] Integrate `expire_pending_for_user()` in `GET /api/requests/{id}` and all mutation handlers in `backend/app/routers/payment_requests.py`
+- [X] T080 [US5] Return `422` with clear message when pay/decline/cancel attempted on EXPIRED in `backend/app/services/payment_requests.py`
+- [X] T081 [US5] Ensure `ExpirationCountdown.tsx` reflects server `expires_at` on `frontend/src/pages/RequestDetailPage.tsx`
 
 **Checkpoint**: Expired requests auto-update on access; mutations blocked with user-friendly errors
 
@@ -200,9 +200,9 @@
 
 **Purpose**: Seed data, static deploy, full test suite, documentation
 
-- [ ] T082 Implement full `backend/seed.py` — users ogulcan/ayca/mehmet; **at least one user with `phone` + `phone_hash`**; wallets, destinations; requests in all statuses including pre-expired PENDING; include phone-targeted incoming sample for tests (U3)
-- [ ] T083 Update `backend/app/main.py` to serve `frontend/dist` static files and SPA fallback excluding `/api/*`
-- [ ] T084 Complete `README.md` — product, stack, Spec-Kit workflow, security model, **`X-User-Email` prototype auth**, PostgreSQL note, local run, seed, Playwright videos path, Render/Railway deploy; **logging policy: application logs and audit events must not contain raw sensitive financial identifiers** — do not log full recipient contacts, wallet IDs on public paths, encrypted identifiers, or provider refs (G2); note services should avoid logging these fields (G2)
+- [X] T082 Implement full `backend/seed.py` — users ogulcan/ayca/mehmet; **at least one user with `phone` + `phone_hash`**; wallets, destinations; requests in all statuses including pre-expired PENDING; include phone-targeted incoming sample for tests (U3)
+- [X] T083 Update `backend/app/main.py` to serve `frontend/dist` static files and SPA fallback excluding `/api/*`
+- [X] T084 Complete `README.md` — product, stack, Spec-Kit workflow, security model, **`X-User-Email` prototype auth**, PostgreSQL note, local run, seed, Playwright videos path, Render/Railway deploy; **logging policy: application logs and audit events must not contain raw sensitive financial identifiers** — do not log full recipient contacts, wallet IDs on public paths, encrypted identifiers, or provider refs (G2); note services should avoid logging these fields (G2)
 - [ ] T085 [P] Create `e2e/playwright.config.ts` with `video: 'on'`, `webServer`, and a **mobile viewport project** (e.g. iPhone-sized) (G1)
 - [ ] T086 Implement `e2e/tests/payment-requests.spec.ts` — all 10 scenarios from `plan.md` **plus mobile viewport dashboard usability check** (G1)
 - [ ] T087 Run `specs/001-p2p-payment-request/quickstart.md` commands and fix any gaps
