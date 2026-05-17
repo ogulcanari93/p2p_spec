@@ -1,0 +1,434 @@
+openapi: 3.1.0
+info:
+  title: P2P Payment Request API
+  version: 0.1.0
+  description: |
+    Prototype API for peer-to-peer payment requests.
+    Authentication is mock email-based via X-User-Email header after login.
+    Production auth is out of scope.
+
+servers:
+  - url: http://localhost:8000
+    description: Local FastAPI (dev or single-service)
+
+tags:
+  - name: auth
+  - name: wallets
+  - name: payment-destinations
+  - name: payment-requests
+  - name: share
+
+components:
+  securitySchemes:
+    UserEmailHeader:
+      type: apiKey
+      in: header
+      name: X-User-Email
+      description: Prototype auth — set to logged-in user email
+
+  schemas:
+    ErrorResponse:
+      type: object
+      required: [detail]
+      properties:
+        detail:
+          oneOf:
+            - type: string
+            - type: array
+              items:
+                type: object
+
+    User:
+      type: object
+      required: [id, email, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        email: { type: string, format: email }
+        display_name: { type: string, nullable: true }
+        phone: { type: string, nullable: true }
+        created_at: { type: string, format: date-time }
+
+    LoginRequest:
+      type: object
+      required: [email]
+      properties:
+        email: { type: string, format: email }
+
+    LoginResponse:
+      type: object
+      required: [user]
+      properties:
+        user:
+          $ref: '#/components/schemas/User'
+
+    Wallet:
+      type: object
+      required: [id, currency, balance_minor, available_balance_minor, status]
+      properties:
+        id: { type: string }
+        currency: { type: string, minLength: 3, maxLength: 3, example: TRY }
+        wallet_type: { type: string, example: INTERNAL }
+        display_name: { type: string, nullable: true }
+        balance_minor: { type: integer, minimum: 0 }
+        available_balance_minor: { type: integer, minimum: 0 }
+        status: { type: string, enum: [ACTIVE, INACTIVE] }
+
+    PaymentDestination:
+      type: object
+      required: [id, destination_type, currency, display_label, status]
+      properties:
+        id: { type: string }
+        destination_type: { type: string, example: INTERNAL_WALLET }
+        currency: { type: string, example: TRY }
+        display_label: { type: string }
+        masked_identifier: { type: string, nullable: true }
+        status: { type: string, enum: [ACTIVE, INACTIVE] }
+        is_default: { type: boolean, description: Computed for UI }
+
+    DestinationSnapshot:
+      type: object
+      required: [destination_type, display_label, currency]
+      properties:
+        destination_type: { type: string }
+        display_label: { type: string }
+        masked_identifier: { type: string, nullable: true }
+        currency: { type: string }
+
+    PaymentRequestStatus:
+      type: string
+      enum: [PENDING, PAID, DECLINED, EXPIRED, CANCELLED]
+
+    RequestEvent:
+      type: object
+      properties:
+        id: { type: string }
+        event_type: { type: string }
+        previous_status: { type: string, nullable: true }
+        new_status: { type: string, nullable: true }
+        created_at: { type: string, format: date-time }
+        actor_user_id: { type: string, nullable: true }
+
+    PaymentRequestSummary:
+      type: object
+      required:
+        - id
+        - status
+        - amount_minor
+        - currency
+        - recipient_contact
+        - created_at
+        - expires_at
+      properties:
+        id: { type: string }
+        share_token: { type: string }
+        status: { $ref: '#/components/schemas/PaymentRequestStatus' }
+        amount_minor: { type: integer }
+        currency: { type: string }
+        note: { type: string, nullable: true }
+        recipient_contact: { type: string }
+        recipient_contact_type: { type: string, enum: [EMAIL, PHONE] }
+        counterparty_label: { type: string, description: Sender email or recipient contact }
+        destination_snapshot:
+          $ref: '#/components/schemas/DestinationSnapshot'
+        created_at: { type: string, format: date-time }
+        expires_at: { type: string, format: date-time }
+        is_expired: { type: boolean }
+        can_pay: { type: boolean }
+        can_decline: { type: boolean }
+        can_cancel: { type: boolean }
+
+    PaymentRequestDetail:
+      allOf:
+        - $ref: '#/components/schemas/PaymentRequestSummary'
+        - type: object
+          properties:
+            sender:
+              type: object
+              properties:
+                id: { type: string }
+                email: { type: string }
+                display_name: { type: string, nullable: true }
+            recipient_user_id: { type: string, nullable: true }
+            paid_at: { type: string, format: date-time, nullable: true }
+            declined_at: { type: string, format: date-time, nullable: true }
+            cancelled_at: { type: string, format: date-time, nullable: true }
+            expired_at: { type: string, format: date-time, nullable: true }
+            share_url: { type: string }
+            events:
+              type: array
+              items:
+                $ref: '#/components/schemas/RequestEvent'
+
+    PublicShareView:
+      type: object
+      description: Safe public summary — no wallet IDs or sensitive destination data
+      properties:
+        status: { $ref: '#/components/schemas/PaymentRequestStatus' }
+        amount_minor: { type: integer }
+        currency: { type: string }
+        note: { type: string, nullable: true }
+        sender_display: { type: string, description: Display name or masked email }
+        recipient_contact_masked: { type: string }
+        created_at: { type: string, format: date-time }
+        expires_at: { type: string, format: date-time }
+
+    CreatePaymentRequest:
+      type: object
+      required: [recipient_contact, amount]
+      properties:
+        recipient_contact:
+          type: string
+          description: Email or phone number
+        amount:
+          type: string
+          description: Decimal string e.g. "125.50"
+          example: "100.00"
+        currency:
+          type: string
+          default: TRY
+        note:
+          type: string
+          maxLength: 280
+        destination_id:
+          type: string
+          description: Optional; defaults to user's active destination for currency
+
+    CreatePaymentRequestResponse:
+      type: object
+      required: [request, share_url]
+      properties:
+        request:
+          $ref: '#/components/schemas/PaymentRequestDetail'
+        share_url:
+          type: string
+          example: http://localhost:8000/r/abc123token
+
+paths:
+  /api/auth/login:
+    post:
+      tags: [auth]
+      summary: Mock email login or register
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: User logged in; default wallet and destination ensured
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '422':
+          description: Invalid email
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/auth/me:
+    get:
+      tags: [auth]
+      security: [{ UserEmailHeader: [] }]
+      summary: Current user profile
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          description: Missing or unknown user header
+
+  /api/wallets/me:
+    get:
+      tags: [wallets]
+      security: [{ UserEmailHeader: [] }]
+      summary: Default wallet for current user
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Wallet'
+
+  /api/payment-destinations/me:
+    get:
+      tags: [payment-destinations]
+      security: [{ UserEmailHeader: [] }]
+      summary: Active payment destinations for selector
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PaymentDestination'
+
+  /api/requests:
+    get:
+      tags: [payment-requests]
+      security: [{ UserEmailHeader: [] }]
+      summary: List payment requests
+      parameters:
+        - name: direction
+          in: query
+          schema:
+            type: string
+            enum: [outgoing, incoming, all]
+            default: all
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [all, PENDING, PAID, DECLINED, EXPIRED, CANCELLED]
+            default: all
+        - name: search
+          in: query
+          schema:
+            type: string
+          description: Substring match on sender email, recipient contact, note
+      responses:
+        '200':
+          description: Expiration evaluated before response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  outgoing:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PaymentRequestSummary'
+                  incoming:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PaymentRequestSummary'
+    post:
+      tags: [payment-requests]
+      security: [{ UserEmailHeader: [] }]
+      summary: Create payment request
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePaymentRequest'
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreatePaymentRequestResponse'
+        '403':
+          description: Destination not owned by sender
+        '422':
+          description: Validation error (amount, contact, destination)
+
+  /api/requests/{id}:
+    get:
+      tags: [payment-requests]
+      security: [{ UserEmailHeader: [] }]
+      summary: Request detail with events
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentRequestDetail'
+        '404':
+          description: Not found or not visible to user
+
+  /api/share/{share_token}:
+    get:
+      tags: [share]
+      summary: Public safe share view
+      parameters:
+        - name: share_token
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicShareView'
+        '404':
+          description: Unknown token
+
+  /api/requests/{id}/pay:
+    post:
+      tags: [payment-requests]
+      security: [{ UserEmailHeader: [] }]
+      summary: Recipient pays pending request
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Paid; wallet credited in same transaction
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentRequestDetail'
+        '403':
+          description: Not recipient
+        '404':
+          description: Not found
+        '409':
+          description: Already paid or concurrent pay
+        '422':
+          description: Expired, terminal status, or invalid destination
+
+  /api/requests/{id}/decline:
+    post:
+      tags: [payment-requests]
+      security: [{ UserEmailHeader: [] }]
+      summary: Recipient declines pending request
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentRequestDetail'
+        '403':
+          description: Not recipient
+        '422':
+          description: Expired or terminal
+
+  /api/requests/{id}/cancel:
+    post:
+      tags: [payment-requests]
+      security: [{ UserEmailHeader: [] }]
+      summary: Sender cancels pending request
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentRequestDetail'
+        '403':
+          description: Not sender
+        '422':
+          description: Expired or terminal

@@ -4,5 +4,17 @@ alwaysApply: true
 
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
-shell commands, and other important information, read the current plan
+shell commands, and other important information, read the current plan:
+
+**Plan**: `specs/001-p2p-payment-request/plan.md`
+
+**Stack**: React + Vite + TypeScript (frontend), Python + FastAPI + SQLAlchemy (backend), SQLite (prototype; PostgreSQL for production).
+
+**Key paths**: `backend/app/`, `frontend/src/`, `e2e/`. Quickstart: `specs/001-p2p-payment-request/quickstart.md`. API: `specs/001-p2p-payment-request/contracts/openapi.yaml`.
+
+**Auth (prototype)**: Mock email login; protected API uses `X-User-Email` header. Document production limitation in README.
+
+**Money**: Decimal strings in UI; integer minor units in DB; never use floats.
+
+**Domain rule**: Payment requests must use sender-owned destinations only (prototype: internal TRY wallets).
 <!-- SPECKIT END -->
